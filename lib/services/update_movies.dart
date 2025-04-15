@@ -1,12 +1,11 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Credenciais
-const String tmdbApiKey =
-    'f6b750ae57811b46ef095aaa96092c59'; // Substitua pela sua chave da TMDb
-const String tmdbAccessToken =
-    'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmNmI3NTBhZTU3ODExYjQ2ZWYwOTVhYWE5NjA5MmM1OSIsIm5iZiI6MTYyOTkzMTI3Ni4zMzQsInN1YiI6IjYxMjZjNzBjNWVkOTYyMDAyNjY5ZGVkYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.UDycv3COVFlnp6a5xEkz1RXo_lyZKw1uud9ibg2qvJA'; // Substitua pelo seu access token da TMDb
+String tmdbApiKey = dotenv.env['TMDB_TOKEN'] ?? '';
+String tmdbAccessToken = dotenv.env['TMDB_KEY'] ?? '';
 
 // Classe para gerenciar a atualização dos filmes
 class MovieUpdater {
@@ -173,7 +172,7 @@ class MovieUpdater {
 // Função principal para executar a atualização
 Future<void> main() async {
   final updater = MovieUpdater();
-  const int listId = 8499489; // Substitua pelo ID da sua lista na TMDb
+  const int listId = 8526195; // Substitua pelo ID da sua lista na TMDb
   try {
     await updater.updateFirestore(listId);
   } catch (e) {
