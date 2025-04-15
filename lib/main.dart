@@ -2,17 +2,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'services/update_movies.dart';
 import 'firebase_options.dart';
-<<<<<<< HEAD
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load();
-=======
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
->>>>>>> d587705815350d03ee9afaaabe860d87cf9af959
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
