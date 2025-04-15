@@ -12,7 +12,10 @@ dependencies:
   firebase_core: ^2.24.2
   cloud_firestore: ^4.14.0
   http: ^1.1.0
+<<<<<<< HEAD
   flutter_dotenv: ^5.0.2
+=======
+>>>>>>> d587705815350d03ee9afaaabe860d87cf9af959
 
 dev_dependencies:
   flutter_test:
