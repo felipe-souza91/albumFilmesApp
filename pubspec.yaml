@@ -1,5 +1,5 @@
 name: album_filmes_app
-description: "A new Flutter project."
+description: "Seu album de filmes pessoal!"
 publish_to: 'none'
 version: 0.1.0
 
@@ -9,20 +9,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.24.2
-  cloud_firestore: ^4.14.0
+  firebase_core: ^3.13.0
+  cloud_firestore: ^5.6.6
   http: ^1.1.0
   flutter_dotenv: ^5.0.2
+  firebase_auth: 5.3.3
+  google_fonts: ^3.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  flutter_native_splash: ^2.4.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/logo.png
+    - assets/logo_tiny.png
     - assets/.env
 

@@ -3,17 +3,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'view/splash_screen.dart';
 import 'firebase_options.dart';
+import 'view/login.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(MyApp());
+  WidgetsFlutterBinding.ensureInitialized(); // <- TEM que vir primeiro
+
+  try {
+    await dotenv.load(fileName: "assets/.env");
+    print("Envs carregadas com Sucesso");
+  } catch (e) {
+    print("Erro ao carregar env: $e");
+  }
+
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      print("Firebase inicializado com sucesso!");
+    } else {
+      print(
+          "Firebase já inicializado com ${Firebase.apps.length} instância(s).");
+    }
+  } catch (e) {
+    print("Erro ao inicializar Firebase: $e");
+  }
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -25,13 +46,15 @@ class MyApp extends StatelessWidget {
       initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),
-        '/home': (context) => HomeScreen(),
+        '/login': (context) => loginPage(),
       },
     );
   }
 }
 
 class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
