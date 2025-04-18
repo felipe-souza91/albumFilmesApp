@@ -2,8 +2,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'view/splash_screen.dart';
-import 'firebase_options.dart';
-import 'view/login.dart';
+import 'services/firebase_options.dart';
+import 'view/auth/login_screen.dart';
+import 'view/auth/signup_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // <- TEM que vir primeiro
@@ -46,7 +47,8 @@ class MyApp extends StatelessWidget {
       initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),
-        '/login': (context) => loginPage(),
+        '/login': (context) => LoginScreen(),
+        '/signup': (context) => SignUpScreen(),
       },
     );
   }
