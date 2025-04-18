@@ -133,8 +133,12 @@ class _AdminScreenState extends State<AdminScreen> {
         return tmdbService.transformMovieData(movieData);
       }).toList();
 
-      setState(() {
+      /*setState(() {
         _status = 'Salvando ${moviesData.length} filmes no Firebase...';
+      });*/
+      setState(() {
+        var i = 0;
+        _status = 'Importando filme ${i + 1} de ${moviesData.length}...';
       });
 
       await firestoreService.addMovies(moviesData);

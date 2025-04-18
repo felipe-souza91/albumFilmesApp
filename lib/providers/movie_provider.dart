@@ -34,8 +34,9 @@ class MovieProvider extends ChangeNotifier {
     try {
       _movies = await getMovies();
       _applyFilters();
-    } catch (e) {
-      _error = e.toString();
+    } catch (e, stackTrace) {
+      _error = 'Error getting movies: $e\n$stackTrace';
+      print(_error);
     } finally {
       _isLoading = false;
       notifyListeners();

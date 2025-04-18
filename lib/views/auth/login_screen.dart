@@ -1,6 +1,8 @@
 // lib/views/auth/login_screen.dart
+import 'package:album_filmes_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:album_filmes_app/views/home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -37,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
               builder: (context) =>
-                  Container()), //chamada HomeScreen() para a tela inicial do app
+                  HomeScreen()), //chamada HomeScreen() para a tela inicial do app
         );
       } on FirebaseAuthException catch (e) {
         setState(() {
@@ -202,6 +204,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
+                          SizedBox(height: 16),
+                          Center(
+                              child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/admin');
+                            },
+                            child: Text("Carregar Dados"),
+                          ))
                         ],
                       ),
                     ),

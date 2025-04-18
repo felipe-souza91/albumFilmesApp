@@ -13,9 +13,10 @@ class TMDBService {
     required this.apiToken,
   });
 
-  Future<Map<String, dynamic>> getList(String listId) async {
+  Future<Map<String, dynamic>> getList(String listId, {int page = 1}) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/list/$listId?api_key=$apiKey&language=$language'),
+      Uri.parse(
+          '$baseUrl/list/$listId?api_key=$apiKey&language=$language&page=$page'),
       headers: {
         'Authorization': 'Bearer $apiToken',
         'Content-Type': 'application/json',
@@ -42,23 +43,33 @@ class TMDBService {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
+      print('Erro ${response.statusCode} ao carregar detalhes de $movieId');
+      print('Body: ${response.body}');
       throw Exception('Failed to load movie details: ${response.statusCode}');
     }
   }
 
   Future<List<Map<String, dynamic>>> getMoviesFromList(String listId) async {
-    final listData = await getList(listId);
-    final List<dynamic> items = listData['items'] ?? [];
-    final List<Map<String, dynamic>> movies = [];
+    List<Map<String, dynamic>> movies = [];
+    int page = 1;
+    int totalPages = 1;
 
-    for (var item in items) {
-      try {
-        final movieDetails = await getMovieDetails(item['id']);
-        movies.add(movieDetails);
-      } catch (e) {
-        print('Error fetching details for movie ${item['id']}: $e');
+    do {
+      final listData = await getList(listId, page: page);
+      final List<dynamic> items = listData['items'] ?? [];
+      totalPages = listData['total_pages'] ?? 1;
+
+      for (var item in items) {
+        try {
+          final movieDetails = await getMovieDetails(item['id']);
+          movies.add(movieDetails);
+        } catch (e) {
+          print('Error fetching details for movie ${item['id']}: $e');
+        }
       }
-    }
+
+      page++;
+    } while (page <= totalPages);
 
     return movies;
   }
