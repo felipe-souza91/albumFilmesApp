@@ -11,6 +11,8 @@ class FirestoreService {
   final String achievementsCollection = 'achievements';
   final String userAchievementsCollection = 'user_achievements';
 
+  FirebaseFirestore get firestore => _firestore;
+
   // Movies
   Future<void> addMovie(Map<String, dynamic> movieData) async {
     try {
