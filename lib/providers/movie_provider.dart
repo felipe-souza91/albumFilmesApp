@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/movie.dart';
 
 class MovieProvider extends ChangeNotifier {
   List<Movie> _movies = [];
+  List<Movie> _userMoviesMap = [];
   List<Movie> _filteredMovies = [];
   bool _isLoading = false;
   String _error = '';
@@ -25,22 +28,52 @@ class MovieProvider extends ChangeNotifier {
   String? get keywordFilter => _keywordFilter;
   String? get nameFilter => _nameFilter;
 
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
+
   // Carregar filmes
-  Future<void> loadMovies(Future<List<Movie>> Function() getMovies) async {
+  Future<void> loadMovies(
+    Future<List<Movie>> Function() getMovies,
+    Future<Map<String, Map<String, dynamic>>> Function() getUserMovies,
+  ) async {
     _isLoading = true;
     _error = '';
     notifyListeners();
 
     try {
-      _movies = await getMovies();
+      final moviesList = await getMovies();
+      final userMoviesMap = await getUserMovies();
+
+      _movies = moviesList.map((movie) {
+        final userData = userMoviesMap[movie.id.toString()];
+        return movie.copyWith(
+          isWatched: userData?['isWatched'] ?? false,
+          rating: userData?['rating']?.toDouble() ?? 0.0,
+        );
+      }).toList();
+
       _applyFilters();
     } catch (e, stackTrace) {
-      _error = 'Error getting movies: $e\n$stackTrace';
+      _error = 'Error getting movies or user data: $e\n$stackTrace';
       print(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<Map<String, Map<String, dynamic>>> getUserMovies() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('user_movies')
+        .where('userId', isEqualTo: currentUserId)
+        .get();
+
+    return {
+      for (var doc in snapshot.docs)
+        doc['movieId']: {
+          'isWatched': doc['watched'],
+          'rating': doc['rating'],
+        }
+    };
   }
 
   // Aplicar filtros

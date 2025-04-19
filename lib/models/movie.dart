@@ -27,10 +27,10 @@ class Movie {
   factory Movie.fromJson(Map<String, dynamic> json) {
     return Movie(
       id: json['id'] ?? 0,
-      title: json['title'] ?? 0,
+      title: json['title'] ?? '',
       description: json['description'],
-      genres: List<String>.from(json['genres'] ?? []),
-      platforms: List<String>.from(json['platforms'] ?? []),
+      genres: List<String>.from(json['genres'] ?? ['Desconhecido']),
+      platforms: List<String>.from(json['platforms'] ?? ['Desconhecida']),
       releaseDate: json['releaseDate'] != null
           ? DateTime.tryParse(json['releaseDate']) ?? DateTime(2000)
           : DateTime(2000),

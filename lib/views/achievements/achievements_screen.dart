@@ -105,9 +105,15 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     return Scaffold(
       backgroundColor: Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: Text('Conquistas'),
-        backgroundColor: Color(0xFF0047AB),
+        iconTheme: IconThemeData(color: Color(0xFFFFD700)),
+        title: Text(
+          'Conquistas',
+          style: TextStyle(color: Color(0xFFFFD700)),
+        ),
+        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
         bottom: TabBar(
+          unselectedLabelColor: Colors.white,
+          labelColor: Color(0xFFFFD700),
           controller: _tabController,
           isScrollable: true,
           indicatorColor: Color(0xFFFFD700),

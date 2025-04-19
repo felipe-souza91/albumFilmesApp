@@ -158,9 +158,12 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: Color(0xFFFFD700),
                 ),
-                child: Text('Cancelar'),
+                child: Text(
+                  'Cancelar',
+                  style: TextStyle(color: Colors.black),
+                ),
               ),
             ],
           ),
@@ -174,8 +177,14 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     return Scaffold(
       backgroundColor: Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: Text('Detalhes do Filme'),
-        backgroundColor: Color(0xFF0047AB),
+        iconTheme: IconThemeData(
+          color: Color(0xFFFFD700), // Cor dos ícones de ação
+        ),
+        title: Text(
+          'Detalhes do Filme',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
         actions: [
           if (_isWatched)
             IconButton(

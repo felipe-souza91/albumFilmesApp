@@ -22,13 +22,13 @@ class Achievement {
 
   factory Achievement.fromJson(Map<String, dynamic> json) {
     return Achievement(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      iconUrl: json['iconUrl'],
-      category: json['category'],
-      ruleType: json['ruleType'],
-      ruleValue: json['ruleValue'],
+      id: json['id'] ?? '0',
+      name: json['name'] ?? 'Desconhecido',
+      description: json['description'] ?? 'Sem descrição',
+      iconUrl: json['iconUrl'] ?? 'no_image.png',
+      category: json['category'] ?? 'Desconhecida',
+      ruleType: json['ruleType'] ?? 'Desconhecido',
+      ruleValue: json['ruleValue'] ?? 0,
       ruleCriteria: Map<String, dynamic>.from(json['ruleCriteria'] ?? {}),
     );
   }

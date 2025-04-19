@@ -27,7 +27,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadMovies() async {
     final movieProvider = Provider.of<MovieProvider>(context, listen: false);
-    await movieProvider.loadMovies(() => _firestoreService.getMovies());
+    await movieProvider.loadMovies(
+      () => _firestoreService.getMovies(),
+      () => movieProvider.getUserMovies(),
+    );
   }
 
   @override
@@ -35,8 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Color(0xFF0D1B2A),
       appBar: AppBar(
-        title: Text('Movie Album'),
-        backgroundColor: Color(0xFF0047AB),
+        iconTheme: IconThemeData(color: Color(0xFFFFD700)),
+        title: Text(
+          'Movie Album',
+          style: TextStyle(color: Color(0xFFFFD700)),
+        ),
+        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
         actions: [
           IconButton(
             icon: Icon(Icons.search),
@@ -254,7 +261,9 @@ class _HomeScreenState extends State<HomeScreen> {
         String searchText = _searchQuery;
 
         return AlertDialog(
-          title: Text('Buscar Filmes'),
+          backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
+          title:
+              Text('Buscar Filmes', style: TextStyle(color: Color(0xFFFFD700))),
           content: TextField(
             onChanged: (value) {
               searchText = value;
@@ -266,12 +275,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           actions: [
             TextButton(
+              style: ButtonStyle(
+                foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
+              ),
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('Cancelar'),
+              child:
+                  Text('Cancelar', style: TextStyle(color: Color(0xFFFFD700))),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFFFD700),
+              ),
               onPressed: () {
                 setState(() {
                   _searchQuery = searchText;
@@ -284,7 +300,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 Navigator.pop(context);
               },
-              child: Text('Buscar'),
+              child: Text('Buscar',
+                  style: TextStyle(color: Color.fromRGBO(11, 18, 34, 1.0))),
             ),
           ],
         );
@@ -318,115 +335,160 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Filtrar Filmes'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Gênero',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+            return Theme(
+                data: ThemeData(
+                  primaryColor: Color(0xFFFFD700),
+                  colorScheme: ColorScheme.fromSwatch().copyWith(
+                    secondary: Color.fromRGBO(11, 18, 34, 1.0),
+                  ),
+                  textButtonTheme: TextButtonThemeData(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Color(0xFFFFD700),
                     ),
-                    SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilterChip(
-                          label: Text('Todos'),
-                          selected: selectedGenre.isEmpty,
-                          onSelected: (selected) {
-                            setState(() {
-                              selectedGenre = '';
-                            });
-                          },
-                        ),
-                        ...genresList.map((genre) {
-                          return FilterChip(
-                            label: Text(genre),
-                            selected: selectedGenre == genre,
-                            onSelected: (selected) {
-                              setState(() {
-                                selectedGenre = selected ? genre : '';
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ],
+                  ),
+                ),
+                child: AlertDialog(
+                  backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
+                  title: Text('Filtrar Filmes',
+                      style: TextStyle(color: Color(0xFFFFD700))),
+                  content: Scrollbar(
+                    thumbVisibility: true,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Gênero',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFFD700)),
+                          ),
+                          SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilterChip(
+                                showCheckmark: false,
+                                labelStyle: TextStyle(color: Colors.black),
+                                selectedColor: Color(0xFFFFD700),
+                                label: Text('Todos'),
+                                selected: selectedGenre.isEmpty,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    selectedGenre = '';
+                                  });
+                                },
+                              ),
+                              ...genresList
+                                  .where((genre) => genre.trim().isNotEmpty)
+                                  .map((genre) {
+                                return FilterChip(
+                                  labelStyle: TextStyle(color: Colors.black),
+                                  showCheckmark: false,
+                                  selectedColor: Color(0xFFFFD700),
+                                  label: Text(genre),
+                                  selected: selectedGenre == genre,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      selectedGenre = selected ? genre : '';
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Plataforma',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFFD700)),
+                          ),
+                          SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilterChip(
+                                labelStyle: TextStyle(color: Colors.black),
+                                showCheckmark: false,
+                                selectedColor: Color(0xFFFFD700),
+                                label: Text('Todas'),
+                                selected: selectedPlatform.isEmpty,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    selectedPlatform = '';
+                                  });
+                                },
+                              ),
+                              ...platformsList
+                                  .where(
+                                      (platform) => platform.trim().isNotEmpty)
+                                  .map((platform) {
+                                return FilterChip(
+                                  labelStyle: TextStyle(color: Colors.black),
+                                  showCheckmark: false,
+                                  selectedColor: Color(0xFFFFD700),
+                                  label: Text(platform),
+                                  selected: selectedPlatform == platform,
+                                  onSelected: (selected) {
+                                    setState(() {
+                                      selectedPlatform =
+                                          selected ? platform : '';
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Plataforma',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text('Cancelar'),
                     ),
-                    SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilterChip(
-                          label: Text('Todas'),
-                          selected: selectedPlatform.isEmpty,
-                          onSelected: (selected) {
-                            setState(() {
-                              selectedPlatform = '';
-                            });
-                          },
-                        ),
-                        ...platformsList.map((platform) {
-                          return FilterChip(
-                            label: Text(platform),
-                            selected: selectedPlatform == platform,
-                            onSelected: (selected) {
-                              setState(() {
-                                selectedPlatform = selected ? platform : '';
-                              });
-                            },
-                          );
-                        }).toList(),
-                      ],
+                    TextButton(
+                      onPressed: () {
+                        movieProvider.clearFilters();
+                        setState(() {
+                          _selectedGenre = '';
+                          _selectedPlatform = '';
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: Text('Limpar Filtros'),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFFFFD700),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _selectedGenre = selectedGenre;
+                          _selectedPlatform = selectedPlatform;
+                        });
+
+                        movieProvider.setGenreFilter(
+                            selectedGenre.isEmpty ? null : selectedGenre);
+                        movieProvider.setPlatformFilter(
+                            selectedPlatform.isEmpty ? null : selectedPlatform);
+
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'Aplicar',
+                        style: TextStyle(color: Colors.black),
+                      ),
                     ),
                   ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text('Cancelar'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    movieProvider.clearFilters();
-                    setState(() {
-                      _selectedGenre = '';
-                      _selectedPlatform = '';
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: Text('Limpar Filtros'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedGenre = selectedGenre;
-                      _selectedPlatform = selectedPlatform;
-                    });
-
-                    movieProvider.setGenreFilter(
-                        selectedGenre.isEmpty ? null : selectedGenre);
-                    movieProvider.setPlatformFilter(
-                        selectedPlatform.isEmpty ? null : selectedPlatform);
-
-                    Navigator.pop(context);
-                  },
-                  child: Text('Aplicar'),
-                ),
-              ],
-            );
+                ));
           },
         );
       },
