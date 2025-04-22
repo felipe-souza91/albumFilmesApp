@@ -24,6 +24,7 @@ dependencies:
   flutter_rating_bar: ^4.0.1
   scratcher: ^2.5.0
   share_plus: ^10.1.4
+  flutter_svg: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +37,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/icons/user.jpg
     - assets/logo.png
     - assets/logo_tiny.png
     - assets/.env

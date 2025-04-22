@@ -5,7 +5,7 @@ import '../../models/movie.dart';
 import '../../providers/movie_provider.dart';
 import '../../services/firestore_service.dart';
 import '../movie_details/movie_details_screen.dart';
-//import '../profile/profile_screen.dart';
+import '/profile/profile_screen.dart';
 import '../achievements/achievements_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -33,6 +33,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _sortearFilme(BuildContext context) {
+    final movieProvider = Provider.of<MovieProvider>(context, listen: false);
+    final movies =
+        movieProvider.filteredMovies.where((m) => !m.isWatched).toList();
+
+    if (movies.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nenhum filme disponível para sortear.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final random = movies..shuffle();
+    final filmeSorteado = random.first;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MovieDetailsScreen(movie: filmeSorteado),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         iconTheme: IconThemeData(color: Color(0xFFFFD700)),
         title: Text(
-          'Movie Album',
+          'Meu Album',
           style: TextStyle(color: Color(0xFFFFD700)),
         ),
         backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
@@ -58,11 +84,17 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           IconButton(
+            icon: Icon(Icons.shuffle_rounded),
+            onPressed: () {
+              _sortearFilme(context);
+            },
+          ),
+          IconButton(
             icon: Icon(Icons.person),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => Container()),
+                MaterialPageRoute(builder: (context) => ProfileScreen()),
               );
             },
           ),
@@ -329,6 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     String selectedGenre = _selectedGenre;
     String selectedPlatform = _selectedPlatform;
+    String watchedStatus = ''; // '', 'watched', 'not_watched'
 
     showDialog(
       context: context,
@@ -396,7 +429,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     });
                                   },
                                 );
-                              }).toList(),
+                              }),
                             ],
                           ),
                           SizedBox(height: 16),
@@ -443,6 +476,56 @@ class _HomeScreenState extends State<HomeScreen> {
                               }).toList(),
                             ],
                           ),
+                          SizedBox(height: 16),
+                          Text(
+                            'Status de Visualização',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFFD700)),
+                          ),
+                          SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilterChip(
+                                labelStyle: TextStyle(color: Colors.black),
+                                selectedColor: Color(0xFFFFD700),
+                                showCheckmark: false,
+                                label: Text('Todos'),
+                                selected: watchedStatus.isEmpty,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    watchedStatus = '';
+                                  });
+                                },
+                              ),
+                              FilterChip(
+                                labelStyle: TextStyle(color: Colors.black),
+                                selectedColor: Color(0xFFFFD700),
+                                showCheckmark: false,
+                                label: Text('Assistidos'),
+                                selected: watchedStatus == 'watched',
+                                onSelected: (selected) {
+                                  setState(() {
+                                    watchedStatus = 'watched';
+                                  });
+                                },
+                              ),
+                              FilterChip(
+                                labelStyle: TextStyle(color: Colors.black),
+                                selectedColor: Color(0xFFFFD700),
+                                showCheckmark: false,
+                                label: Text('Não assistidos'),
+                                selected: watchedStatus == 'not_watched',
+                                onSelected: (selected) {
+                                  setState(() {
+                                    watchedStatus = 'not_watched';
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -479,6 +562,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             selectedGenre.isEmpty ? null : selectedGenre);
                         movieProvider.setPlatformFilter(
                             selectedPlatform.isEmpty ? null : selectedPlatform);
+                        movieProvider.setWatchedFilter(
+                            watchedStatus.isEmpty ? null : watchedStatus);
 
                         Navigator.pop(context);
                       },

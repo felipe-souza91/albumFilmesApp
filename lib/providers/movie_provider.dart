@@ -16,6 +16,7 @@ class MovieProvider extends ChangeNotifier {
   String? _platformFilter;
   String? _keywordFilter;
   String? _nameFilter;
+  String? _watchedFilter;
 
   // Getters
   List<Movie> get movies => _movies;
@@ -105,7 +106,25 @@ class MovieProvider extends ChangeNotifier {
           .toList();
     }
 
+    if (_watchedFilter != null) {
+      if (_watchedFilter == 'watched') {
+        _filteredMovies = _filteredMovies.where((m) => m.isWatched).toList();
+      } else if (_watchedFilter == 'not_watched') {
+        _filteredMovies = _filteredMovies.where((m) => !m.isWatched).toList();
+      }
+    }
+
     notifyListeners();
+  }
+
+  // Aplicar filtros com base em parâmetros
+  void setFilters(
+      {String? genre, String? platform, String? name, String? watchedStatus}) {
+    _genreFilter = genre;
+    _platformFilter = platform;
+    _nameFilter = name;
+    _watchedFilter = watchedStatus; // nova variável
+    _applyFilters();
   }
 
   // Definir filtro de gênero
@@ -138,6 +157,11 @@ class MovieProvider extends ChangeNotifier {
     _platformFilter = null;
     _keywordFilter = null;
     _nameFilter = null;
+    _applyFilters();
+  }
+
+  void setWatchedFilter(String? status) {
+    _watchedFilter = status;
     _applyFilters();
   }
 

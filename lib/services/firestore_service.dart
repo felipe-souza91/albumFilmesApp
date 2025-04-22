@@ -88,6 +88,25 @@ class FirestoreService {
     }
   }
 
+  Future<void> markMovieAsUnwatched(String userId, String movieId,
+      {double rating = 0.0}) async {
+    try {
+      await _firestore
+          .collection(userMoviesCollection)
+          .doc('${userId}_${movieId}')
+          .set({
+        'userId': userId,
+        'movieId': movieId,
+        'watched': false,
+        'watchedDate': FieldValue.serverTimestamp(),
+        'rating': rating,
+      });
+    } catch (e) {
+      print('Error marking movie as watched: $e');
+      throw e;
+    }
+  }
+
   Future<void> rateMovie(String userId, String movieId, double rating) async {
     try {
       await _firestore

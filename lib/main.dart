@@ -9,6 +9,7 @@ import 'services/firebase_options.dart';
 import 'views/auth/login_screen.dart';
 import 'views/auth/signup_screen.dart';
 import 'views/home/home_screen.dart';
+import 'profile/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // <- TEM que vir primeiro
@@ -69,6 +70,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(),
         '/signup': (context) => SignUpScreen(),
         '/admin': (context) => AdminScreen(),
+        '/profile': (context) => ProfileScreen(),
         '/home': (context) => HomeScreen(),
       },
     );

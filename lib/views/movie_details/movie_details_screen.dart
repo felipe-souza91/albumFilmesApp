@@ -72,6 +72,43 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     }
   }
 
+  Future<void> _markAsUnwatched() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _firestoreService.markMovieAsUnwatched(
+        userId,
+        widget.movie.id.toString(),
+        rating: _rating,
+      );
+
+      setState(() {
+        _isWatched = false;
+      });
+
+      // Atualizar o provider
+      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
+      movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Filme marcado como não assistido!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao marcar filme como não assistido: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _rateMovie(double rating) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
@@ -414,7 +451,15 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                 style: TextStyle(color: Color(0xFF0D1B2A)),
               ),
             )
-          : null,
+          : FloatingActionButton.extended(
+              onPressed: _markAsUnwatched,
+              backgroundColor: Color.fromARGB(255, 224, 48, 30),
+              icon: Icon(Icons.check, color: Color(0xFF0D1B2A)),
+              label: Text(
+                'Marcar como não assistido',
+                style: TextStyle(color: Color(0xFF0D1B2A)),
+              ),
+            ),
     );
   }
 }
