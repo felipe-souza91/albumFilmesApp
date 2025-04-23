@@ -1,19 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../models/movie.dart';
 
 class MovieProvider extends ChangeNotifier {
   List<Movie> _movies = [];
-  List<Movie> _userMoviesMap = [];
   List<Movie> _filteredMovies = [];
   bool _isLoading = false;
   String _error = '';
 
   // Filtros ativos
-  String? _genreFilter;
-  String? _platformFilter;
+  List<String>? _genreFilter;
+  List<String>? _platformFilter;
   String? _keywordFilter;
   String? _nameFilter;
   String? _watchedFilter;
@@ -24,8 +22,8 @@ class MovieProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String get error => _error;
 
-  String? get genreFilter => _genreFilter;
-  String? get platformFilter => _platformFilter;
+  List<String>? get genreFilter => _genreFilter;
+  List<String>? get platformFilter => _platformFilter;
   String? get keywordFilter => _keywordFilter;
   String? get nameFilter => _nameFilter;
 
@@ -55,7 +53,7 @@ class MovieProvider extends ChangeNotifier {
       _applyFilters();
     } catch (e, stackTrace) {
       _error = 'Error getting movies or user data: $e\n$stackTrace';
-      print(_error);
+      //print(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -79,62 +77,81 @@ class MovieProvider extends ChangeNotifier {
 
   // Aplicar filtros
   void _applyFilters() {
-    _filteredMovies = _movies;
+    var result = [..._movies];
 
     if (_genreFilter != null && _genreFilter!.isNotEmpty) {
-      _filteredMovies = _filteredMovies
-          .where((movie) => movie.genres.contains(_genreFilter))
+      result = result
+          .where((movie) =>
+              movie.genres.any((genre) => _genreFilter!.contains(genre)))
           .toList();
     }
 
     if (_platformFilter != null && _platformFilter!.isNotEmpty) {
-      _filteredMovies = _filteredMovies
-          .where((movie) => movie.platforms.contains(_platformFilter))
+      result = result
+          .where((movie) => movie.platforms
+              .any((platform) => _platformFilter!.contains(platform)))
           .toList();
     }
 
     if (_keywordFilter != null && _keywordFilter!.isNotEmpty) {
-      _filteredMovies = _filteredMovies
+      result = result
           .where((movie) => movie.keywords.contains(_keywordFilter))
           .toList();
     }
 
     if (_nameFilter != null && _nameFilter!.isNotEmpty) {
       final lowerCaseName = _nameFilter!.toLowerCase();
-      _filteredMovies = _filteredMovies
+      result = result
           .where((movie) => movie.title.toLowerCase().contains(lowerCaseName))
           .toList();
     }
 
     if (_watchedFilter != null) {
       if (_watchedFilter == 'watched') {
-        _filteredMovies = _filteredMovies.where((m) => m.isWatched).toList();
+        result = result.where((m) => m.isWatched).toList();
       } else if (_watchedFilter == 'not_watched') {
-        _filteredMovies = _filteredMovies.where((m) => !m.isWatched).toList();
+        result = result.where((m) => !m.isWatched).toList();
       }
     }
 
+    _filteredMovies = result;
     notifyListeners();
   }
 
+  void setGenreFilterList(List<String>? genres) {
+    _genreFilter = genres;
+    _applyFilters();
+  }
+
+  void setPlatformFilterList(List<String>? platforms) {
+    _platformFilter = platforms;
+    _applyFilters();
+  }
+
   // Aplicar filtros com base em parâmetros
-  void setFilters(
-      {String? genre, String? platform, String? name, String? watchedStatus}) {
-    _genreFilter = genre;
-    _platformFilter = platform;
+  void setFilters({
+    List<String>? genres,
+    List<String>? platforms,
+    String? keyword,
+    String? name,
+    String? watchedStatus,
+  }) {
+    _genreFilter = genres;
+    _platformFilter = platforms;
+    _keywordFilter = keyword;
     _nameFilter = name;
-    _watchedFilter = watchedStatus; // nova variável
+    _watchedFilter = watchedStatus;
     _applyFilters();
   }
 
   // Definir filtro de gênero
-  void setGenreFilter(String? genre) {
+  void setGenreFilter(List<String>? genre) {
     _genreFilter = genre;
     _applyFilters();
   }
 
   // Definir filtro de plataforma
-  void setPlatformFilter(String? platform) {
+  void setPlatformFilter(List<String>? platform) {
     _platformFilter = platform;
     _applyFilters();
   }
@@ -157,6 +174,7 @@ class MovieProvider extends ChangeNotifier {
     _platformFilter = null;
     _keywordFilter = null;
     _nameFilter = null;
+    _watchedFilter = null;
     _applyFilters();
   }
 

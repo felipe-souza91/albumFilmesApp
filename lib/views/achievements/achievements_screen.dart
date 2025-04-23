@@ -6,11 +6,13 @@ import '../../models/achievement.dart';
 import '../../services/firestore_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
+  const AchievementsScreen({super.key});
+
   @override
-  _AchievementsScreenState createState() => _AchievementsScreenState();
+  AchievementsScreenState createState() => AchievementsScreenState();
 }
 
-class _AchievementsScreenState extends State<AchievementsScreen>
+class AchievementsScreenState extends State<AchievementsScreen>
     with SingleTickerProviderStateMixin {
   final FirestoreService _firestoreService = FirestoreService();
   bool _isLoading = true;
@@ -61,9 +63,11 @@ class _AchievementsScreenState extends State<AchievementsScreen>
           .map((doc) => UserAchievement.fromJson(doc.data()))
           .toList();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao carregar conquistas: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar conquistas: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -94,9 +98,11 @@ class _AchievementsScreenState extends State<AchievementsScreen>
     try {
       await Share.share(text, subject: 'Compartilhar via WhatsApp');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao compartilhar: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao compartilhar: $e')),
+        );
+      }
     }
   }
 

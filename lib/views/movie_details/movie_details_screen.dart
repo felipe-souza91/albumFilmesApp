@@ -13,20 +13,19 @@ class MovieDetailsScreen extends StatefulWidget {
   final Movie movie;
 
   const MovieDetailsScreen({
-    Key? key,
+    super.key,
     required this.movie,
-  }) : super(key: key);
+  });
 
   @override
-  _MovieDetailsScreenState createState() => _MovieDetailsScreenState();
+  MovieDetailsScreenState createState() => MovieDetailsScreenState();
 }
 
-class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
+class MovieDetailsScreenState extends State<MovieDetailsScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   bool _isWatched = false;
   double _rating = 0.0;
   bool _isLoading = false;
-  bool _showScratchPoster = false;
 
   @override
   void initState() {
@@ -55,16 +54,23 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       });
 
       // Atualizar o provider
-      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
-      movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), true);
+      if (mounted) {
+        final movieProvider =
+            Provider.of<MovieProvider>(context, listen: false);
+        movieProvider.updateMovieWatchedStatus(
+            widget.movie.id.toString(), true);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Filme marcado como assistido!')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Filme marcado como assistido!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
-      );
+      if (mounted) {
+        // Exibir mensagem de erro
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -91,17 +97,24 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         _isWatched = false;
       });
 
-      // Atualizar o provider
-      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
-      movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), false);
+      if (mounted) {
+        // Atualizar o provider
+        final movieProvider =
+            Provider.of<MovieProvider>(context, listen: false);
+        movieProvider.updateMovieWatchedStatus(
+            widget.movie.id.toString(), false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Filme marcado como não assistido!')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Filme marcado como não assistido!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao marcar filme como não assistido: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Erro ao marcar filme como não assistido: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -125,17 +138,22 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         rating,
       );
 
-      // Atualizar o provider
-      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
-      movieProvider.updateMovieRating(widget.movie.id.toString(), rating);
+      if (mounted) {
+        // Atualizar o provider
+        final movieProvider =
+            Provider.of<MovieProvider>(context, listen: false);
+        movieProvider.updateMovieRating(widget.movie.id.toString(), rating);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Avaliação salva!')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Avaliação atualizada!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao avaliar filme: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar avaliação: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -150,16 +168,16 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     try {
       await Share.share(text, subject: 'Compartilhar via WhatsApp');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao compartilhar: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao compartilhar: $e')),
+        );
+      }
     }
   }
 
   void _showScratchDialog() {
-    setState(() {
-      _showScratchPoster = true;
-    });
+    setState(() {});
 
     showDialog(
       context: context,

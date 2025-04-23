@@ -42,3 +42,9 @@ flutter:
     - assets/logo_tiny.png
     - assets/.env
 
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo_tiny.png" # Substitua pelo caminho do seu ícone
+  adaptive_icon_background: "#FFFFFF" # Cor de fundo (somente para Android)
+  adaptive_icon_foreground: "assets/logo_tiny.png"

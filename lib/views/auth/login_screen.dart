@@ -1,15 +1,16 @@
 // lib/views/auth/login_screen.dart
-import 'package:album_filmes_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:album_filmes_app/views/home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  LoginScreenState createState() => LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -36,11 +37,13 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text,
         );
 
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-              builder: (context) =>
-                  HomeScreen()), //chamada HomeScreen() para a tela inicial do app
-        );
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+                builder: (context) =>
+                    HomeScreen()), //chamada HomeScreen() para a tela inicial do app
+          );
+        }
       } on FirebaseAuthException catch (e) {
         setState(() {
           if (e.code == 'user-not-found') {

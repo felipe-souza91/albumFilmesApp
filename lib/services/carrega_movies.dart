@@ -2,15 +2,16 @@
 import 'package:flutter/material.dart';
 import 'package:album_filmes_app/services/tmdb_service.dart';
 import 'package:album_filmes_app/services/firestore_service.dart';
-import 'package:album_filmes_app/controllers/movie_controller.dart';
 import 'package:album_filmes_app/controllers/achievement_controller.dart';
 
 class AdminScreen extends StatefulWidget {
+  const AdminScreen({super.key});
+
   @override
-  _AdminScreenState createState() => _AdminScreenState();
+  AdminScreenState createState() => AdminScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen> {
+class AdminScreenState extends State<AdminScreen> {
   final String apiKey = 'f6b750ae57811b46ef095aaa96092c59';
   final String apiToken =
       'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmNmI3NTBhZTU3ODExYjQ2ZWYwOTVhYWE5NjA5MmM1OSIsIm5iZiI6MTYyOTkzMTI3Ni4zMzQsInN1YiI6IjYxMjZjNzBjNWVkOTYyMDAyNjY5ZGVkYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.UDycv3COVFlnp6a5xEkz1RXo_lyZKw1uud9ibg2qvJA';
@@ -107,12 +108,6 @@ class _AdminScreenState extends State<AdminScreen> {
       );
 
       final firestoreService = FirestoreService();
-
-      // Inicializar controladores
-      final movieController = MovieController(
-        tmdbService: tmdbService,
-        firestoreService: firestoreService,
-      );
 
       final achievementController = AchievementController(
         firestoreService: firestoreService,

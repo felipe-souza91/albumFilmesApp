@@ -1,7 +1,6 @@
 // lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/movie.dart';
-import '../models/achievement.dart';
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -21,8 +20,8 @@ class FirestoreService {
           .doc(movieData['id'].toString())
           .set(movieData);
     } catch (e) {
-      print('Error adding movie: $e');
-      throw e;
+      //print('Error adding movie: $e');
+      rethrow;
     }
   }
 
@@ -39,8 +38,8 @@ class FirestoreService {
     try {
       await batch.commit();
     } catch (e) {
-      print('Error adding movies in batch: $e');
-      throw e;
+      //print('Error adding movies in batch: $e');
+      rethrow;
     }
   }
 
@@ -49,8 +48,8 @@ class FirestoreService {
       final snapshot = await _firestore.collection(moviesCollection).get();
       return snapshot.docs.map((doc) => Movie.fromJson(doc.data())).toList();
     } catch (e) {
-      print('Error getting movies: $e');
-      throw e;
+      //print('Error getting movies: $e');
+      rethrow;
     }
   }
 
@@ -63,8 +62,8 @@ class FirestoreService {
       }
       return null;
     } catch (e) {
-      print('Error getting movie: $e');
-      throw e;
+      //print('Error getting movie: $e');
+      rethrow;
     }
   }
 
@@ -74,7 +73,7 @@ class FirestoreService {
     try {
       await _firestore
           .collection(userMoviesCollection)
-          .doc('${userId}_${movieId}')
+          .doc('${userId}_$movieId')
           .set({
         'userId': userId,
         'movieId': movieId,
@@ -83,8 +82,8 @@ class FirestoreService {
         'rating': rating,
       });
     } catch (e) {
-      print('Error marking movie as watched: $e');
-      throw e;
+      //print('Error marking movie as watched: $e');
+      rethrow;
     }
   }
 
@@ -93,7 +92,7 @@ class FirestoreService {
     try {
       await _firestore
           .collection(userMoviesCollection)
-          .doc('${userId}_${movieId}')
+          .doc('${userId}_$movieId')
           .set({
         'userId': userId,
         'movieId': movieId,
@@ -102,8 +101,8 @@ class FirestoreService {
         'rating': rating,
       });
     } catch (e) {
-      print('Error marking movie as watched: $e');
-      throw e;
+      //print('Error marking movie as watched: $e');
+      rethrow;
     }
   }
 
@@ -111,15 +110,15 @@ class FirestoreService {
     try {
       await _firestore
           .collection(userMoviesCollection)
-          .doc('${userId}_${movieId}')
+          .doc('${userId}_$movieId')
           .set({
         'userId': userId,
         'movieId': movieId,
         'rating': rating,
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error rating movie: $e');
-      throw e;
+      //print('Error rating movie: $e');
+      rethrow;
     }
   }
 
@@ -145,8 +144,8 @@ class FirestoreService {
 
       return movies;
     } catch (e) {
-      print('Error getting watched movies: $e');
-      throw e;
+      //print('Error getting watched movies: $e');
+      rethrow;
     }
   }
 
@@ -164,8 +163,8 @@ class FirestoreService {
     try {
       await batch.commit();
     } catch (e) {
-      print('Error setting up achievements: $e');
-      throw e;
+      //print('Error setting up achievements: $e');
+      rethrow;
     }
   }
 
@@ -173,7 +172,7 @@ class FirestoreService {
     try {
       await _firestore
           .collection(userAchievementsCollection)
-          .doc('${userId}_${achievementId}')
+          .doc('${userId}_$achievementId')
           .set({
         'userId': userId,
         'achievementId': achievementId,
@@ -181,8 +180,8 @@ class FirestoreService {
         'unlockedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error unlocking achievement: $e');
-      throw e;
+      //print('Error unlocking achievement: $e');
+      rethrow;
     }
   }
 
@@ -191,15 +190,15 @@ class FirestoreService {
     try {
       await _firestore
           .collection(userAchievementsCollection)
-          .doc('${userId}_${achievementId}')
+          .doc('${userId}_$achievementId')
           .set({
         'userId': userId,
         'achievementId': achievementId,
         'progress': progress,
       }, SetOptions(merge: true));
     } catch (e) {
-      print('Error updating achievement progress: $e');
-      throw e;
+      //print('Error updating achievement progress: $e');
+      rethrow;
     }
   }
 }

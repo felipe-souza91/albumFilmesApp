@@ -1,6 +1,4 @@
 // lib/controllers/achievement_controller.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/achievement.dart';
 import '../services/firestore_service.dart';
 import '../models/movie.dart';
 
@@ -256,11 +254,10 @@ class AchievementController {
 
     try {
       await firestoreService.setupAchievements(achievements);
-      print(
-          'Successfully set up ${achievements.length} achievements in Firebase');
+      //print('Successfully set up ${achievements.length} achievements in Firebase');
     } catch (e) {
-      print('Error setting up achievements: $e');
-      throw e;
+      //print('Error setting up achievements: $e');
+      rethrow;
     }
   }
 
@@ -341,8 +338,8 @@ class AchievementController {
 
       // Outras verificações seriam implementadas aqui
     } catch (e) {
-      print('Error checking achievements: $e');
-      throw e;
+      //print('Error checking achievements: $e');
+      rethrow;
     }
   }
 }

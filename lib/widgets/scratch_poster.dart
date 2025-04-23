@@ -1,7 +1,5 @@
 // lib/widgets/scratch_poster.dart
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 import 'package:scratcher/scratcher.dart';
 
 class ScratchPoster extends StatefulWidget {
@@ -12,13 +10,13 @@ class ScratchPoster extends StatefulWidget {
   final double scratchThreshold;
 
   const ScratchPoster({
-    Key? key,
+    super.key,
     required this.imageUrl,
     required this.width,
     required this.height,
     required this.onScratchComplete,
     this.scratchThreshold = 0.7, // 70% raspado para considerar completo
-  }) : super(key: key);
+  });
 
   @override
   State<ScratchPoster> createState() => _ScratchPosterState();
@@ -43,7 +41,7 @@ class _ScratchPosterState extends State<ScratchPoster> {
         Scratcher(
           brushSize: 40,
           threshold: widget.scratchThreshold * 100, // precisa ser em %
-          color: Colors.grey.withOpacity(0.9),
+          color: Colors.grey,
           onThreshold: () {
             widget.onScratchComplete();
           },

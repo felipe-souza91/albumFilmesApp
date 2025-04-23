@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// TODO: add flutter_svg to pubspec.yaml
 import 'package:flutter_svg/flutter_svg.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -7,10 +6,18 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFF0D1B2A),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text("Profile"),
+        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
+        title: Text(
+          "Minha Conta",
+          style: TextStyle(color: Color(0xFFFFD700)),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFFFFD700)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 20),
@@ -19,28 +26,18 @@ class ProfileScreen extends StatelessWidget {
             const ProfilePic(),
             const SizedBox(height: 20),
             ProfileMenu(
-              text: "My Account",
-              icon: "assets/icons/User Icon.svg",
+              text: "Minha conta",
+              iconData: Icons.person,
               press: () => {},
             ),
             ProfileMenu(
-              text: "Notifications",
-              icon: "assets/icons/Bell.svg",
-              press: () {},
-            ),
-            ProfileMenu(
-              text: "Settings",
-              icon: "assets/icons/Settings.svg",
-              press: () {},
-            ),
-            ProfileMenu(
-              text: "Help Center",
-              icon: "assets/icons/Question mark.svg",
+              text: "Preferencias",
+              iconData: Icons.settings,
               press: () {},
             ),
             ProfileMenu(
               text: "Log Out",
-              icon: "assets/icons/Log out.svg",
+              iconData: Icons.logout,
               press: () {},
             ),
           ],
@@ -52,8 +49,8 @@ class ProfileScreen extends StatelessWidget {
 
 class ProfilePic extends StatelessWidget {
   const ProfilePic({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +72,7 @@ class ProfilePic extends StatelessWidget {
               width: 46,
               child: TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.white,
+                  foregroundColor: Color.fromRGBO(11, 18, 34, 1.0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(50),
                     side: const BorderSide(color: Colors.white),
@@ -95,13 +92,14 @@ class ProfilePic extends StatelessWidget {
 
 class ProfileMenu extends StatelessWidget {
   const ProfileMenu({
-    Key? key,
+    super.key,
     required this.text,
-    required this.icon,
+    required this.iconData,
     this.press,
-  }) : super(key: key);
+  });
 
-  final String text, icon;
+  final String text;
+  final IconData? iconData;
   final VoidCallback? press;
 
   @override
@@ -110,7 +108,7 @@ class ProfileMenu extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: TextButton(
         style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFFFF7643),
+          foregroundColor: const Color(0xFFFFD700),
           padding: const EdgeInsets.all(20),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -119,12 +117,7 @@ class ProfileMenu extends StatelessWidget {
         onPressed: press,
         child: Row(
           children: [
-            SvgPicture.asset(
-              icon,
-              colorFilter:
-                  const ColorFilter.mode(Color(0xFFFF7643), BlendMode.srcIn),
-              width: 22,
-            ),
+            Icon(iconData, color: const Color.fromRGBO(11, 18, 34, 1.0)),
             const SizedBox(width: 20),
             Expanded(
               child: Text(

@@ -9,14 +9,17 @@ import '/profile/profile_screen.dart';
 import '../achievements/achievements_screen.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   final FirestoreService _firestoreService = FirestoreService();
-  String _selectedGenre = '';
-  String _selectedPlatform = '';
+
+  List<String> _selectedGenres = [];
+  List<String> _selectedPlatforms = [];
   String _searchQuery = '';
 
   @override
@@ -221,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black,
                 ),
                 child: Center(
                   child: Text(
@@ -247,7 +250,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     bottomLeft: Radius.circular(10),
                     bottomRight: Radius.circular(10),
                   ),
-                  color: Colors.black.withOpacity(0.7),
+                  color: Colors.black,
                 ),
                 child: Text(
                   movie.title,
@@ -308,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               style: ButtonStyle(
-                foregroundColor: MaterialStateProperty.all<Color>(Colors.white),
+                foregroundColor: WidgetStatePropertyAll<Color>(Colors.grey),
               ),
               onPressed: () {
                 Navigator.pop(context);
@@ -359,8 +362,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final List<String> platformsList = platforms.toList()..sort();
 
-    String selectedGenre = _selectedGenre;
-    String selectedPlatform = _selectedPlatform;
+    List<String> selectedGenre = _selectedGenres;
+    List<String> selectedPlatform = _selectedPlatforms;
     String watchedStatus = ''; // '', 'watched', 'not_watched'
 
     showDialog(
@@ -410,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 selected: selectedGenre.isEmpty,
                                 onSelected: (selected) {
                                   setState(() {
-                                    selectedGenre = '';
+                                    selectedGenre = [];
                                   });
                                 },
                               ),
@@ -422,10 +425,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   showCheckmark: false,
                                   selectedColor: Color(0xFFFFD700),
                                   label: Text(genre),
-                                  selected: selectedGenre == genre,
+                                  selected: selectedGenre.contains(genre),
                                   onSelected: (selected) {
                                     setState(() {
-                                      selectedGenre = selected ? genre : '';
+                                      if (selected) {
+                                        _selectedGenres.add(genre);
+                                      } else {
+                                        _selectedGenres.remove(genre);
+                                      }
                                     });
                                   },
                                 );
@@ -452,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 selected: selectedPlatform.isEmpty,
                                 onSelected: (selected) {
                                   setState(() {
-                                    selectedPlatform = '';
+                                    selectedPlatform = [];
                                   });
                                 },
                               ),
@@ -465,15 +472,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                   showCheckmark: false,
                                   selectedColor: Color(0xFFFFD700),
                                   label: Text(platform),
-                                  selected: selectedPlatform == platform,
+                                  selected: selectedPlatform.contains(platform),
                                   onSelected: (selected) {
                                     setState(() {
-                                      selectedPlatform =
-                                          selected ? platform : '';
+                                      if (selected) {
+                                        _selectedPlatforms.add(platform);
+                                      } else {
+                                        _selectedPlatforms.remove(platform);
+                                      }
                                     });
                                   },
                                 );
-                              }).toList(),
+                              }),
                             ],
                           ),
                           SizedBox(height: 16),
@@ -541,8 +551,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: () {
                         movieProvider.clearFilters();
                         setState(() {
-                          _selectedGenre = '';
-                          _selectedPlatform = '';
+                          _selectedGenres = [];
+                          _selectedPlatforms = [];
                         });
                         Navigator.pop(context);
                       },
@@ -554,8 +564,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       onPressed: () {
                         setState(() {
-                          _selectedGenre = selectedGenre;
-                          _selectedPlatform = selectedPlatform;
+                          _selectedGenres = selectedGenre;
+                          _selectedPlatforms = selectedPlatform;
                         });
 
                         movieProvider.setGenreFilter(
