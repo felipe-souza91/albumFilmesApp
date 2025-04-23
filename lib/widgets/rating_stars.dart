@@ -11,7 +11,7 @@ class RatingStars extends StatelessWidget {
   final bool allowHalfRating;
 
   const RatingStars({
-    Key? key,
+    super.key,
     this.rating = 0.0,
     this.size = 24.0,
     this.color = Colors.amber,
@@ -19,7 +19,7 @@ class RatingStars extends StatelessWidget {
     this.backgroundColor = Colors.grey,
     this.onRatingChanged,
     this.allowHalfRating = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

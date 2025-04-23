@@ -43,8 +43,8 @@ class TMDBService {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      print('Erro ${response.statusCode} ao carregar detalhes de $movieId');
-      print('Body: ${response.body}');
+      //print('Erro ${response.statusCode} ao carregar detalhes de $movieId');
+      //print('Body: ${response.body}');
       throw Exception('Failed to load movie details: ${response.statusCode}');
     }
   }
@@ -64,7 +64,7 @@ class TMDBService {
           final movieDetails = await getMovieDetails(item['id']);
           movies.add(movieDetails);
         } catch (e) {
-          print('Error fetching details for movie ${item['id']}: $e');
+          //print('Error fetching details for movie ${item['id']}: $e');
         }
       }
 

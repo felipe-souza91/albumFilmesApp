@@ -27,11 +27,10 @@ class MovieController {
       // Salvar filmes no Firebase
       await firestoreService.addMovies(moviesData);
 
-      print(
-          'Successfully imported ${moviesData.length} movies from TMDB list to Firebase');
+      //print('Successfully imported ${moviesData.length} movies from TMDB list to Firebase');
     } catch (e) {
-      print('Error importing movies from TMDB: $e');
-      throw e;
+      //print('Error importing movies from TMDB: $e');
+      rethrow;
     }
   }
 
@@ -40,8 +39,8 @@ class MovieController {
     try {
       return await firestoreService.getMovies();
     } catch (e) {
-      print('Error getting all movies: $e');
-      throw e;
+      //print('Error getting all movies: $e');
+      rethrow;
     }
   }
 
@@ -52,8 +51,8 @@ class MovieController {
       await firestoreService.markMovieAsWatched(userId, movieId,
           rating: rating);
     } catch (e) {
-      print('Error marking movie as watched: $e');
-      throw e;
+      //print('Error marking movie as watched: $e');
+      rethrow;
     }
   }
 
@@ -62,8 +61,8 @@ class MovieController {
     try {
       await firestoreService.rateMovie(userId, movieId, rating);
     } catch (e) {
-      print('Error rating movie: $e');
-      throw e;
+      //print('Error rating movie: $e');
+      rethrow;
     }
   }
 
@@ -72,8 +71,8 @@ class MovieController {
     try {
       return await firestoreService.getWatchedMovies(userId);
     } catch (e) {
-      print('Error getting watched movies: $e');
-      throw e;
+      //print('Error getting watched movies: $e');
+      rethrow;
     }
   }
 

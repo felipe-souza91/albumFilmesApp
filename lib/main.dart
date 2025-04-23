@@ -16,9 +16,9 @@ void main() async {
 
   try {
     await dotenv.load(fileName: "assets/.env");
-    print("Envs carregadas com Sucesso");
+    //print("Envs carregadas com Sucesso");
   } catch (e) {
-    print("Erro ao carregar env: $e");
+    //print("Erro ao carregar env: $e");
   }
 
   try {
@@ -26,13 +26,12 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print("Firebase inicializado com sucesso!");
+      //print("Firebase inicializado com sucesso!");
     } else {
-      print(
-          "Firebase já inicializado com ${Firebase.apps.length} instância(s).");
+      //print("Firebase já inicializado com ${Firebase.apps.length} instância(s).");
     }
   } catch (e) {
-    print("Erro ao inicializar Firebase: $e");
+    //print("Erro ao inicializar Firebase: $e");
   }
 
   runApp(
