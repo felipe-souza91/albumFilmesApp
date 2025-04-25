@@ -424,7 +424,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                   SizedBox(height: 24),
 
                   // Palavras-chave
-                  Text(
+                  /*Text(
                     'Palavras-chave',
                     style: TextStyle(
                       fontSize: 20,
@@ -455,7 +455,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                               backgroundColor: Colors.white70,
                             );
                           }).toList(),
-                        ),
+                        ),*/
                 ],
               ),
             ),

@@ -41,7 +41,8 @@ class _ScratchPosterState extends State<ScratchPoster> {
         Scratcher(
           brushSize: 40,
           threshold: widget.scratchThreshold * 100, // precisa ser em %
-          color: Colors.grey,
+          color: const Color.fromARGB(239, 0, 0, 0),
+
           onThreshold: () {
             widget.onScratchComplete();
           },

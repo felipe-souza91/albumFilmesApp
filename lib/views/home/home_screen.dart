@@ -7,6 +7,7 @@ import '../../services/firestore_service.dart';
 import '../movie_details/movie_details_screen.dart';
 import '/profile/profile_screen.dart';
 import '../achievements/achievements_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -205,13 +206,23 @@ class HomeScreenState extends State<HomeScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: movie.posterUrl.isNotEmpty
-                  ? Image.network(
-                      movie.posterUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: movie.posterUrl,
+                      errorWidget: (context, url, error) => Icon(Icons.error),
                       fit: BoxFit.cover,
+                      placeholder: (context, url) => Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 50, vertical: 90),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFFD700),
+                            //backgroundColor: Colors.white,
+                          )),
                       colorBlendMode: movie.isWatched
                           ? BlendMode.saturation
                           : BlendMode.color,
-                      color: movie.isWatched ? null : Colors.grey,
+                      color: movie.isWatched
+                          ? null
+                          : const Color.fromARGB(255, 53, 53, 53),
                     )
                   : Container(
                       color: Colors.grey,
@@ -224,18 +235,25 @@ class HomeScreenState extends State<HomeScreen> {
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  color: Colors.black,
+                  color: const Color.fromARGB(0, 32, 32, 32),
                 ),
-                child: Center(
+                /*child: Center(
                   child: Text(
                     'Toque para assistir',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
+                      shadows: const [
+                        Shadow(
+                          color: Colors.black,
+                          offset: Offset(1, 1),
+                          blurRadius: 2,
+                        ),
+                      ],
                     ),
                     textAlign: TextAlign.center,
                   ),
-                ),
+                ),*/
               ),
 
             // Título do filme
@@ -250,7 +268,7 @@ class HomeScreenState extends State<HomeScreen> {
                     bottomLeft: Radius.circular(10),
                     bottomRight: Radius.circular(10),
                   ),
-                  color: Colors.black,
+                  color: const Color.fromARGB(185, 0, 0, 0),
                 ),
                 child: Text(
                   movie.title,
