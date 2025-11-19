@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"albumfilmesapp","appId":"1:343723762122:android:db2d794e2b534c45e86f33","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"albumfilmesapp","configurations":{"android":"1:343723762122:android:db2d794e2b534c45e86f33","ios":"1:343723762122:ios:1fcd31fd5bf4231fe86f33","macos":"1:343723762122:ios:1fcd31fd5bf4231fe86f33","web":"1:343723762122:web:7b7657d374280c2ae86f33","windows":"1:343723762122:web:e734ec7a8590654fe86f33"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "albumfilmesapp",
+          "appId": "1:343723762122:android:db2d794e2b534c45e86f33",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "albumfilmesapp",
+          "configurations": {
+            "android": "1:343723762122:android:db2d794e2b534c45e86f33",
+            "ios": "1:343723762122:ios:1fcd31fd5bf4231fe86f33",
+            "macos": "1:343723762122:ios:1fcd31fd5bf4231fe86f33",
+            "web": "1:343723762122:web:7b7657d374280c2ae86f33",
+            "windows": "1:343723762122:web:e734ec7a8590654fe86f33"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
