@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../views/auth/login_screen.dart';
+import 'preferences_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -31,14 +35,27 @@ class ProfileScreen extends StatelessWidget {
               press: () => {},
             ),
             ProfileMenu(
-              text: "Preferencias",
+              text: "Preferências",
               iconData: Icons.settings,
-              press: () {},
+              press: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const PreferencesScreen(),
+                  ),
+                );
+              },
             ),
             ProfileMenu(
               text: "Log Out",
               iconData: Icons.logout,
-              press: () {},
+              press: () async {
+                await FirebaseAuth.instance.signOut();
+                if (!context.mounted) return; // se você transformar em Stateful
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              },
             ),
           ],
         ),

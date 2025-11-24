@@ -43,6 +43,11 @@ service cloud.firestore {
       allow read, write: if isAuth() && request.auth.uid == uid;
     }
 
+    match /user_preferences/{uid} {
+      // docId = uid do usuário logado
+      allow read, write: if isAuth() && request.auth.uid == uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

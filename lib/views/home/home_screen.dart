@@ -8,6 +8,10 @@ import '../movie_details/movie_details_screen.dart';
 import '/profile/profile_screen.dart';
 import '../achievements/achievements_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../services/user_preferences_service.dart';
+import '../../services/personalized_picker_service.dart';
+import '../../models/user_preferences.dart';
+import '../../services/personalized_picker_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,6 +67,121 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Set<String> _deriveTagsFromMovie(Movie movie) {
+    final tags = <String>{};
+    final g = movie.genres.map((e) => e.toLowerCase()).toSet();
+    final k = movie.keywords.map((e) => e.toLowerCase()).toSet();
+
+    bool containsAny(Set<String> base, List<String> needles) {
+      return base.any((v) => needles.any((n) => v.contains(n)));
+    }
+
+    // Terror / suspense
+    if (containsAny(g, ['terror', 'horror', 'suspense', 'thriller']) ||
+        containsAny(k, ['terror', 'horror', 'assustador', 'thriller'])) {
+      tags.add('terror_supernatural');
+    }
+
+    // Violência / guerra / crime
+    if (containsAny(g, ['guerra', 'war', 'crime', 'ação', 'action']) ||
+        containsAny(k, ['violento', 'guerra', 'crime', 'luta'])) {
+      tags.add('violence_graphic');
+    }
+
+    // Dramas bem pesados
+    if (containsAny(g, ['drama', 'biografia', 'biography']) &&
+        containsAny(k, ['triste', 'tragédia', 'pesado', 'luto'])) {
+      tags.add('sad_heavy');
+    }
+
+    return tags;
+  }
+
+  int? _releaseYearFromMovie(Movie movie) {
+    try {
+      return movie.releaseDate.year;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _sortearFilmePersonalizado(BuildContext context) async {
+    final movieProvider = Provider.of<MovieProvider>(context, listen: false);
+
+    // 1) Carrega preferências do usuário
+    final prefs =
+        await UserPreferencesService.instance.getCurrentUserPreferences();
+
+    if (prefs == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Antes, responda o questionário de preferências em Perfil > Preferências 😉',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 2) Pega a lista de filmes filtrados (igual à usada na tela)
+    final movies =
+        movieProvider.filteredMovies.where((m) => !m.isWatched).toList();
+
+    if (movies.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhum filme disponível para sortear.'),
+        ),
+      );
+      return;
+    }
+
+    // Como não temos popularidade nem runtime, vamos aproximar:
+    // - voteAverage: usar movie.rating (assumindo 0..10)
+    // - popularityNormalized: usar 0.5 para todos por enquanto.
+    double normPop(Movie m) => 0.5;
+
+    final candidates = movies.map((m) {
+      return MovieCandidate<Movie>(
+        movie: m,
+        title: m.title,
+        releaseYear: _releaseYearFromMovie(m),
+        runtimeMinutes: null, // não temos duração no modelo ainda
+        voteAverage: m.rating.clamp(0.0, 10.0),
+        popularityNormalized: normPop(m),
+        isWatched: m.isWatched,
+        isAdult: false, // se um dia tiver flag +18, ajusta aqui
+        genres: m.genres.toSet(),
+        tags: _deriveTagsFromMovie(m),
+      );
+    }).toList();
+
+    // 3) Usa o serviço de sorteio personalizado
+    final picked =
+        PersonalizedPickerService.instance.pickMovie<Movie>(candidates, prefs);
+
+    if (picked == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não encontramos nenhum filme com a sua cara usando essas preferências.\nTente ajustar o questionário ou usar o sorteio simples.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final filmeSorteado = picked.movie;
+
+    // 4) Abre a tela de detalhes do filme sorteado
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MovieDetailsScreen(movie: filmeSorteado),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,6 +204,13 @@ class HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.filter_list),
             onPressed: () {
               _showFilterDialog();
+            },
+          ),
+          IconButton(
+            tooltip: 'Sorteio personalizado',
+            icon: const Icon(Icons.auto_awesome),
+            onPressed: () {
+              _sortearFilmePersonalizado(context);
             },
           ),
           IconButton(
@@ -145,6 +271,13 @@ class HomeScreenState extends State<HomeScreen> {
           }
 
           final movies = movieProvider.filteredMovies;
+          final allMovies = movieProvider.movies;
+
+// total de filmes carregados
+          final totalCount = allMovies.length;
+
+// quantos assistidos (olhando sempre a lista completa, não só filtrada)
+          final watchedCount = allMovies.where((m) => m.isWatched).length;
 
           if (movies.isEmpty) {
             return Center(
@@ -155,19 +288,39 @@ class HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          return GridView.builder(
-            padding: EdgeInsets.all(16),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.7,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: movies.length,
-            itemBuilder: (context, index) {
-              final movie = movies[index];
-              return _buildMovieCard(movie);
-            },
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (totalCount > 0)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    '$watchedCount / $totalCount filmes assistidos',
+                    style: const TextStyle(
+                      color: Color(0xFFFFD700),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.7,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: movies.length,
+                  itemBuilder: (context, index) {
+                    final movie = movies[index];
+                    return _buildMovieCard(movie);
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
