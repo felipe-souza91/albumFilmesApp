@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../models/movie.dart';
+import '../../models/achievement.dart';
 import '../../providers/movie_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/rating_stars.dart';
 import '../../widgets/scratch_poster.dart';
+
+import '../../controllers/achievement_controller.dart';
+import '../achievements/achievement_unlocked_dialog.dart';
 
 class MovieDetailsScreen extends StatefulWidget {
   final Movie movie;
@@ -34,6 +39,42 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
     _rating = widget.movie.rating;
   }
 
+  Future<void> _showUnlockedAchievementsPopup(List<String> unlockedIds) async {
+    if (unlockedIds.isEmpty) return;
+    if (!mounted) return;
+
+    try {
+      // Carrega todas as conquistas para mapear id -> Achievement
+      final snap = await _firestoreService.firestore
+          .collection(_firestoreService.achievementsCollection)
+          .get();
+
+      final all = snap.docs.map((d) => Achievement.fromJson(d.data())).toList();
+
+      // Mostra um dialog por conquista desbloqueada agora
+      for (final id in unlockedIds) {
+        Achievement? ach;
+        try {
+          ach = all.firstWhere((a) => a.id == id);
+        } catch (_) {
+          ach = null;
+        }
+
+        if (!mounted) return;
+
+        if (ach != null) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AchievementUnlockedDialog(achievement: ach!),
+          );
+        }
+      }
+    } catch (_) {
+      // se falhar carregar conquistas, não quebra a experiência do usuário
+    }
+  }
+
   Future<void> _markAsWatched() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
@@ -53,28 +94,45 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         _isWatched = true;
       });
 
-      // Atualizar o provider
-      if (mounted) {
-        final movieProvider =
-            Provider.of<MovieProvider>(context, listen: false);
-        movieProvider.updateMovieWatchedStatus(
-            widget.movie.id.toString(), true);
+      if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Filme marcado como assistido!')),
-        );
-      }
+      // Atualizar o provider
+      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
+      movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), true);
+
+      // ✅ Checar conquistas e capturar as recém-desbloqueadas
+      final watchedMovies =
+          movieProvider.movies.where((m) => m.isWatched).toList();
+      final watchedIds = watchedMovies.map((m) => m.id.toString()).toList();
+
+      final achievementController =
+          AchievementController(firestoreService: _firestoreService);
+
+      final newlyUnlockedIds = await achievementController.checkAchievements(
+        userId,
+        watchedIds,
+        watchedMovies,
+      );
+
+      // Feedback padrão
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Filme marcado como assistido!')),
+      );
+
+      // 🎉 Pop-up de conquistas desbloqueadas agora
+      await _showUnlockedAchievementsPopup(newlyUnlockedIds);
     } catch (e) {
       if (mounted) {
-        // Exibir mensagem de erro
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -97,17 +155,15 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         _isWatched = false;
       });
 
-      if (mounted) {
-        // Atualizar o provider
-        final movieProvider =
-            Provider.of<MovieProvider>(context, listen: false);
-        movieProvider.updateMovieWatchedStatus(
-            widget.movie.id.toString(), false);
+      if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Filme marcado como não assistido!')),
-        );
-      }
+      // Atualizar o provider
+      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
+      movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Filme marcado como não assistido!')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -116,9 +172,11 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -138,16 +196,15 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         rating,
       );
 
-      if (mounted) {
-        // Atualizar o provider
-        final movieProvider =
-            Provider.of<MovieProvider>(context, listen: false);
-        movieProvider.updateMovieRating(widget.movie.id.toString(), rating);
+      if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Avaliação atualizada!')),
-        );
-      }
+      // Atualizar o provider
+      final movieProvider = Provider.of<MovieProvider>(context, listen: false);
+      movieProvider.updateMovieRating(widget.movie.id.toString(), rating);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Avaliação atualizada!')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -155,9 +212,11 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -188,7 +247,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const Text(
                 'Raspe o pôster para marcar como assistido',
                 style: TextStyle(
                   color: Colors.white,
@@ -197,7 +256,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ScratchPoster(
                 imageUrl: widget.movie.posterUrl,
                 width: 300,
@@ -207,15 +266,15 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                   _markAsWatched();
                 },
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFFFFD700),
+                  backgroundColor: const Color(0xFFFFD700),
                 ),
-                child: Text(
+                child: const Text(
                   'Cancelar',
                   style: TextStyle(color: Colors.black),
                 ),
@@ -230,40 +289,36 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF0D1B2A),
+      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        iconTheme: IconThemeData(
-          color: Color(0xFFFFD700), // Cor dos ícones de ação
-        ),
-        title: Text(
+        iconTheme: const IconThemeData(color: Color(0xFFFFD700)),
+        title: const Text(
           'Detalhes do Filme',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
+        backgroundColor: const Color.fromRGBO(11, 18, 34, 1.0),
         actions: [
           if (_isWatched)
             IconButton(
-              icon: Icon(Icons.share),
+              icon: const Icon(Icons.share),
               onPressed: _shareViaWhatsApp,
             ),
         ],
       ),
       body: _isLoading
-          ? Center(
+          ? const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
               ),
             )
           : SingleChildScrollView(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Poster e informações básicas
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Poster
                       GestureDetector(
                         onTap: _isWatched ? null : _showScratchDialog,
                         child: Container(
@@ -271,7 +326,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                           height: 225,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
+                            boxShadow: const [
                               BoxShadow(
                                 color: Colors.black26,
                                 blurRadius: 5,
@@ -292,7 +347,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                                   )
                                 : Container(
                                     color: Colors.grey,
-                                    child: Icon(
+                                    child: const Icon(
                                       Icons.movie,
                                       size: 50,
                                       color: Colors.white,
@@ -301,29 +356,25 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(width: 16),
-
-                      // Informações básicas
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               widget.movie.title,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
                               'Lançamento: ${widget.movie.releaseDate.year}',
-                              style: TextStyle(
-                                color: Colors.white70,
-                              ),
+                              style: const TextStyle(color: Colors.white70),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
@@ -331,27 +382,27 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                                 return Chip(
                                   label: Text(
                                     genre,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: Color(0xFF0D1B2A),
                                     ),
                                   ),
-                                  backgroundColor: Color(0xFFFFD700),
+                                  backgroundColor: const Color(0xFFFFD700),
                                 );
                               }).toList(),
                             ),
-                            SizedBox(height: 16),
+                            const SizedBox(height: 16),
                             if (_isWatched)
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     'Sua avaliação:',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  SizedBox(height: 8),
+                                  const SizedBox(height: 8),
                                   RatingStars(
                                     rating: _rating,
                                     size: 30,
@@ -364,11 +415,8 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       ),
                     ],
                   ),
-
-                  SizedBox(height: 24),
-
-                  // Descrição
-                  Text(
+                  const SizedBox(height: 24),
+                  const Text(
                     'Sinopse',
                     style: TextStyle(
                       fontSize: 20,
@@ -376,19 +424,13 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     widget.movie.description,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      height: 1.5,
-                    ),
+                    style: const TextStyle(color: Colors.white70, height: 1.5),
                   ),
-
-                  SizedBox(height: 24),
-
-                  // Plataformas disponíveis
-                  Text(
+                  const SizedBox(height: 24),
+                  const Text(
                     'Disponível em',
                     style: TextStyle(
                       fontSize: 20,
@@ -396,9 +438,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   widget.movie.platforms.isEmpty
-                      ? Text(
+                      ? const Text(
                           'Informação não disponível',
                           style: TextStyle(
                             color: Colors.white70,
@@ -412,68 +454,30 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                             return Chip(
                               label: Text(
                                 platform,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                ),
+                                style: const TextStyle(color: Colors.white),
                               ),
-                              backgroundColor: Color(0xFF0047AB),
+                              backgroundColor: const Color(0xFF0047AB),
                             );
                           }).toList(),
                         ),
-
-                  SizedBox(height: 24),
-
-                  // Palavras-chave
-                  /*Text(
-                    'Palavras-chave',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  widget.movie.keywords.isEmpty
-                      ? Text(
-                          'Informação não disponível',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: widget.movie.keywords.map((keyword) {
-                            return Chip(
-                              label: Text(
-                                keyword,
-                                style: TextStyle(
-                                  color: Color(0xFF0D1B2A),
-                                ),
-                              ),
-                              backgroundColor: Colors.white70,
-                            );
-                          }).toList(),
-                        ),*/
                 ],
               ),
             ),
       floatingActionButton: !_isWatched
           ? FloatingActionButton.extended(
               onPressed: _showScratchDialog,
-              backgroundColor: Color(0xFFFFD700),
-              icon: Icon(Icons.check, color: Color(0xFF0D1B2A)),
-              label: Text(
+              backgroundColor: const Color(0xFFFFD700),
+              icon: const Icon(Icons.check, color: Color(0xFF0D1B2A)),
+              label: const Text(
                 'Marcar como assistido',
                 style: TextStyle(color: Color(0xFF0D1B2A)),
               ),
             )
           : FloatingActionButton.extended(
               onPressed: _markAsUnwatched,
-              backgroundColor: Color.fromARGB(255, 224, 48, 30),
-              icon: Icon(Icons.check, color: Color(0xFF0D1B2A)),
-              label: Text(
+              backgroundColor: const Color.fromARGB(255, 224, 48, 30),
+              icon: const Icon(Icons.check, color: Color(0xFF0D1B2A)),
+              label: const Text(
                 'Marcar como não assistido',
                 style: TextStyle(color: Color(0xFF0D1B2A)),
               ),

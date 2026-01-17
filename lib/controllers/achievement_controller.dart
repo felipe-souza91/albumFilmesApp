@@ -1,4 +1,3 @@
-// lib/controllers/achievement_controller.dart
 import '../services/firestore_service.dart';
 import '../models/movie.dart';
 
@@ -169,7 +168,7 @@ class AchievementController {
         'iconUrl': 'assets/icons/achievements/flip_phone.png',
         'category': 'era',
         'ruleType': 'count',
-        'ruleValue': 15,
+        'ruleValue': 20,
         'ruleCriteria': {'type': 'decade', 'decade': '2000'},
       },
       {
@@ -252,94 +251,106 @@ class AchievementController {
       },
     ];
 
-    try {
-      await firestoreService.setupAchievements(achievements);
-      //print('Successfully set up ${achievements.length} achievements in Firebase');
-    } catch (e) {
-      //print('Error setting up achievements: $e');
-      rethrow;
-    }
+    await firestoreService.setupAchievements(achievements);
   }
 
-  // Verificar conquistas para um usuário
-  Future<void> checkAchievements(String userId, List<String> watchedMovieIds,
-      List<Movie> watchedMovies) async {
-    try {
-      // Verificar conquistas por quantidade total de filmes
-      final int totalWatched = watchedMovieIds.length;
+  /// Verificar conquistas para um usuário.
+  /// Retorna uma lista de IDs que foram desbloqueadas AGORA (para mostrar popup).
+  Future<List<String>> checkAchievements(
+    String userId,
+    List<String> watchedMovieIds,
+    List<Movie> watchedMovies,
+  ) async {
+    final newlyUnlocked = <String>[];
 
-      if (totalWatched >= 100) {
-        await firestoreService.unlockAchievement(userId, 'enthusiast');
+    Future<void> unlockIf(bool condition, String achievementId) async {
+      if (!condition) return;
+
+      // 🔥 IMPORTANTE: unlockAchievement precisa retornar bool (true = desbloqueou agora)
+      final unlockedNow =
+          await firestoreService.unlockAchievement(userId, achievementId);
+
+      if (unlockedNow == true) {
+        newlyUnlocked.add(achievementId);
       }
-
-      if (totalWatched >= 300) {
-        await firestoreService.unlockAchievement(userId, 'leonidas');
-      }
-
-      if (totalWatched >= 500) {
-        await firestoreService.unlockAchievement(userId, 'marathon_master');
-      }
-
-      if (totalWatched >= 1000) {
-        await firestoreService.unlockAchievement(userId, 'screen_legend');
-      }
-
-      // Atualizar progresso para conquistas não desbloqueadas
-      await firestoreService.updateAchievementProgress(
-          userId, 'enthusiast', totalWatched);
-      await firestoreService.updateAchievementProgress(
-          userId, 'leonidas', totalWatched);
-      await firestoreService.updateAchievementProgress(
-          userId, 'marathon_master', totalWatched);
-      await firestoreService.updateAchievementProgress(
-          userId, 'screen_legend', totalWatched);
-
-      // Verificar conquistas por gênero
-      final Map<String, int> genreCounts = {};
-
-      for (var movie in watchedMovies) {
-        for (var genre in movie.genres) {
-          genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
-        }
-      }
-
-      // Verificar conquistas específicas por gênero
-      if ((genreCounts['Ação'] ?? 0) >= 20) {
-        await firestoreService.unlockAchievement(userId, 'action_fan');
-      }
-
-      if ((genreCounts['Romance'] ?? 0) >= 15) {
-        await firestoreService.unlockAchievement(userId, 'romance_lover');
-      }
-
-      if ((genreCounts['Comédia'] ?? 0) >= 25) {
-        await firestoreService.unlockAchievement(userId, 'comedy_master');
-      }
-
-      if ((genreCounts['Terror'] ?? 0) >= 10) {
-        await firestoreService.unlockAchievement(userId, 'horror_survivor');
-      }
-
-      if ((genreCounts['Ficção científica'] ?? 0) >= 12) {
-        await firestoreService.unlockAchievement(userId, 'scifi_explorer');
-      }
-
-      // Atualizar progresso para conquistas de gênero
-      await firestoreService.updateAchievementProgress(
-          userId, 'action_fan', genreCounts['Ação'] ?? 0);
-      await firestoreService.updateAchievementProgress(
-          userId, 'romance_lover', genreCounts['Romance'] ?? 0);
-      await firestoreService.updateAchievementProgress(
-          userId, 'comedy_master', genreCounts['Comédia'] ?? 0);
-      await firestoreService.updateAchievementProgress(
-          userId, 'horror_survivor', genreCounts['Terror'] ?? 0);
-      await firestoreService.updateAchievementProgress(
-          userId, 'scifi_explorer', genreCounts['Ficção científica'] ?? 0);
-
-      // Outras verificações seriam implementadas aqui
-    } catch (e) {
-      //print('Error checking achievements: $e');
-      rethrow;
     }
+
+    // 1) Quantidade total de filmes
+    final int totalWatched = watchedMovieIds.length;
+
+    await unlockIf(totalWatched >= 100, 'enthusiast');
+    await unlockIf(totalWatched >= 300, 'leonidas');
+    await unlockIf(totalWatched >= 500, 'marathon_master');
+    await unlockIf(totalWatched >= 1000, 'screen_legend');
+
+    await firestoreService.updateAchievementProgress(
+        userId, 'enthusiast', totalWatched);
+    await firestoreService.updateAchievementProgress(
+        userId, 'leonidas', totalWatched);
+    await firestoreService.updateAchievementProgress(
+        userId, 'marathon_master', totalWatched);
+    await firestoreService.updateAchievementProgress(
+        userId, 'screen_legend', totalWatched);
+
+    // 2) Conquistas por gênero
+    final Map<String, int> genreCounts = {};
+
+    for (final movie in watchedMovies) {
+      for (final genre in movie.genres) {
+        genreCounts[genre] = (genreCounts[genre] ?? 0) + 1;
+      }
+    }
+
+    final int actionCount = genreCounts['Ação'] ?? 0;
+    final int romanceCount = genreCounts['Romance'] ?? 0;
+    final int comedyCount = genreCounts['Comédia'] ?? 0;
+    final int horrorCount = genreCounts['Terror'] ?? 0;
+    final int scifiCount = genreCounts['Ficção científica'] ?? 0;
+
+    await unlockIf(actionCount >= 20, 'action_fan');
+    await unlockIf(romanceCount >= 15, 'romance_lover');
+    await unlockIf(comedyCount >= 25, 'comedy_master');
+    await unlockIf(horrorCount >= 10, 'horror_survivor');
+    await unlockIf(scifiCount >= 12, 'scifi_explorer');
+
+    await firestoreService.updateAchievementProgress(
+        userId, 'action_fan', actionCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'romance_lover', romanceCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'comedy_master', comedyCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'horror_survivor', horrorCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'scifi_explorer', scifiCount);
+
+    // 3) Conquistas por época (décadas / clássicos)
+    int count80s = 0;
+    int count2000s = 0;
+    int countBefore1950 = 0;
+
+    for (final movie in watchedMovies) {
+      final year = movie.releaseDate.year;
+      if (year >= 1980 && year <= 1989) count80s++;
+      if (year >= 2000 && year <= 2009) count2000s++;
+      if (year < 1950) countBefore1950++;
+    }
+
+    await unlockIf(count80s >= 10, '80s_nostalgia');
+    await firestoreService.updateAchievementProgress(
+        userId, '80s_nostalgia', count80s);
+
+    await unlockIf(count2000s >= 20, '2000s_journey');
+    await firestoreService.updateAchievementProgress(
+        userId, '2000s_journey', count2000s);
+
+    // "classic_rediscovered" é antes de 1950; se quiser exigir mais que 1, ajusta aqui
+    await unlockIf(countBefore1950 >= 1, 'classic_rediscovered');
+    await firestoreService.updateAchievementProgress(
+        userId, 'classic_rediscovered', countBefore1950);
+
+    // TODO: global_cinema, social e outras conquistas especiais
+
+    return newlyUnlocked;
   }
 }

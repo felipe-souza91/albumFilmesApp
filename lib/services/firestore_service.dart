@@ -168,21 +168,44 @@ class FirestoreService {
     }
   }
 
-  Future<void> unlockAchievement(String userId, String achievementId) async {
-    try {
-      await _firestore
-          .collection(userAchievementsCollection)
-          .doc('${userId}_$achievementId')
-          .set({
-        'userId': userId,
-        'achievementId': achievementId,
-        'unlocked': true,
-        'unlockedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      //print('Error unlocking achievement: $e');
-      rethrow;
-    }
+  Future<bool> unlockAchievement(String userId, String achievementId) async {
+    final docId = '${userId}_$achievementId';
+    final ref = firestore.collection(userAchievementsCollection).doc(docId);
+
+    return firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+
+      if (snap.exists) {
+        final data = snap.data() as Map<String, dynamic>;
+        final already = (data['unlocked'] ?? false) == true;
+        if (already) return false;
+
+        tx.set(
+            ref,
+            {
+              'userId': userId,
+              'achievementId': achievementId,
+              'unlocked': true,
+              'unlockedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
+
+        return true;
+      } else {
+        tx.set(
+            ref,
+            {
+              'userId': userId,
+              'achievementId': achievementId,
+              'unlocked': true,
+              'progress': 0,
+              'unlockedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
+
+        return true;
+      }
+    });
   }
 
   Future<void> updateAchievementProgress(
