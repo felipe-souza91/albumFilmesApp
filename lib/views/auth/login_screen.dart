@@ -24,6 +24,144 @@ class LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _forgotPassword({String? prefilledEmail}) async {
+    final emailController = TextEditingController(text: prefilledEmail ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        bool isSending = false;
+
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            Future<void> send() async {
+              final email = emailController.text.trim();
+
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content:
+                          Text('Digite seu e-mail para recuperar a senha.')),
+                );
+                return;
+              }
+              if (!email.contains('@')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Digite um e-mail válido.')),
+                );
+                return;
+              }
+
+              setStateDialog(() => isSending = true);
+
+              try {
+                await FirebaseAuth.instance
+                    .sendPasswordResetEmail(email: email);
+
+                if (!mounted) return;
+
+                Navigator.pop(context); // fecha dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        'Enviamos um e-mail com o link de redefinição de senha.'),
+                  ),
+                );
+              } on FirebaseAuthException catch (e) {
+                setState(() {
+                  switch (e.code) {
+                    case 'user-not-found':
+                      _errorMessage =
+                          'Não encontramos uma conta com esse e-mail.';
+                      break;
+                    case 'wrong-password':
+                    case 'invalid-credential': // Firebase mais novo usa bastante esse
+                      _errorMessage = 'E-mail ou senha inválidos.';
+                      break;
+                    case 'invalid-email':
+                      _errorMessage =
+                          'E-mail inválido. Verifique e tente novamente.';
+                      break;
+                    case 'too-many-requests':
+                      _errorMessage =
+                          'Muitas tentativas. Tente novamente mais tarde.';
+                      break;
+                    case 'network-request-failed':
+                      _errorMessage =
+                          'Sem conexão. Verifique sua internet e tente novamente.';
+                      break;
+                    default:
+                      _errorMessage =
+                          'Não foi possível fazer login agora. Tente novamente.';
+                  }
+                });
+              } catch (_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Erro inesperado. Tente novamente.')),
+                );
+              } finally {
+                setStateDialog(() => isSending = false);
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color.fromRGBO(11, 18, 34, 1.0),
+              title: const Text(
+                'Recuperar senha',
+                style: TextStyle(
+                    color: Color(0xFFFFD700), fontWeight: FontWeight.bold),
+              ),
+              content: TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(color: Color(0xFFFFD700)),
+                cursorColor: const Color(0xFFFFD700),
+                decoration: InputDecoration(
+                  hintText: 'Digite seu e-mail',
+                  hintStyle: const TextStyle(color: Colors.white54),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: const BorderSide(color: Colors.white24),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide:
+                        const BorderSide(color: Color(0xFFFFD700), width: 2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onSubmitted: (_) => isSending ? null : send(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSending ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar',
+                      style: TextStyle(color: Colors.white70)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD700),
+                    foregroundColor: const Color(0xFF0D1B2A),
+                  ),
+                  onPressed: isSending ? null : send,
+                  child: isSending
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Enviar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -148,12 +286,11 @@ class LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                // Implementar recuperação de senha
-                              },
-                              child: Text(
+                              onPressed: () => _forgotPassword(
+                                  prefilledEmail: _emailController.text),
+                              child: const Text(
                                 'Esqueceu sua senha?',
-                                style: TextStyle(color: Colors.white),
+                                style: TextStyle(color: Color(0xFFFFD700)),
                               ),
                             ),
                           ),
@@ -211,13 +348,6 @@ class LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           SizedBox(height: 16),
-                          Center(
-                              child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/admin');
-                            },
-                            child: Text("Carregar Dados"),
-                          ))
                         ],
                       ),
                     ),

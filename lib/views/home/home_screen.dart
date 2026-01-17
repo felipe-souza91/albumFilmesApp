@@ -361,15 +361,32 @@ class HomeScreenState extends State<HomeScreen> {
               child: movie.posterUrl.isNotEmpty
                   ? CachedNetworkImage(
                       imageUrl: movie.posterUrl,
-                      errorWidget: (context, url, error) => Icon(Icons.error),
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 50, vertical: 90),
-                          child: CircularProgressIndicator(
-                            color: Color(0xFFFFD700),
-                            //backgroundColor: Colors.white,
-                          )),
+
+                      // ✅ “parece mais rápido”
+                      fadeInDuration: const Duration(milliseconds: 120),
+                      fadeOutDuration: const Duration(milliseconds: 80),
+
+                      // ✅ carrega uma imagem menor (grid 2 colunas)
+                      // ajuste fino: 350 costuma ficar bom pra poster em grid
+                      memCacheWidth: 350,
+
+                      // ✅ placeholder bem mais leve
+                      placeholder: (context, url) => Container(
+                        color: const Color.fromARGB(255, 20, 30, 50),
+                        child: const Center(
+                          child: Icon(Icons.local_movies,
+                              color: Colors.white24, size: 30),
+                        ),
+                      ),
+
+                      errorWidget: (context, url, error) => const Center(
+                          child:
+                              Icon(Icons.broken_image, color: Colors.white54)),
+
+                      // ✅ render mais leve
+                      filterQuality: FilterQuality.low,
+
                       colorBlendMode: movie.isWatched
                           ? BlendMode.saturation
                           : BlendMode.color,
@@ -471,12 +488,35 @@ class HomeScreenState extends State<HomeScreen> {
           title:
               Text('Buscar Filmes', style: TextStyle(color: Color(0xFFFFD700))),
           content: TextField(
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) {
+              setState(() => _searchQuery = searchText);
+              final movieProvider =
+                  Provider.of<MovieProvider>(context, listen: false);
+              movieProvider
+                  .setNameFilter(searchText.isEmpty ? null : searchText);
+              Navigator.pop(context);
+            },
             onChanged: (value) {
               searchText = value;
             },
+            style: const TextStyle(color: Color(0xFFFFD700)),
+            cursorColor: const Color(0xFFFFD700),
             decoration: InputDecoration(
               hintText: 'Digite o nome do filme',
-              prefixIcon: Icon(Icons.search),
+              hintStyle: const TextStyle(color: Colors.white54),
+              prefixIcon: const Icon(Icons.search, color: Color(0xFFFFD700)),
+              filled: true,
+              fillColor: Colors.white10,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: Color(0xFFFFD700), width: 2),
+              ),
             ),
           ),
           actions: [

@@ -7,11 +7,21 @@ service cloud.firestore {
     }
 
     function isOwner(uidField) {
-      return isAuth() && request.auth.uid == resource.data[uidField];
+      return isAuth()
+        && resource != null
+        && request.auth.uid == resource.data[uidField];
     }
 
     function isOwnerReq(uidField) {
       return isAuth() && request.auth.uid == request.resource.data[uidField];
+    }
+
+    // ✅ PERFIL DO USUÁRIO (faltava isso)
+    match /users/{uid} {
+      allow read: if isAuth() && request.auth.uid == uid;
+      allow create: if isAuth() && request.auth.uid == uid;
+      allow update: if isAuth() && request.auth.uid == uid;
+      allow delete: if false;
     }
 
     match /movies/{movieId} {
@@ -44,7 +54,6 @@ service cloud.firestore {
     }
 
     match /user_preferences/{uid} {
-      // docId = uid do usuário logado
       allow read, write: if isAuth() && request.auth.uid == uid;
     }
 

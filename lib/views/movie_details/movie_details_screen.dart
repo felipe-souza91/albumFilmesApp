@@ -14,12 +14,18 @@ import '../../widgets/scratch_poster.dart';
 import '../../controllers/achievement_controller.dart';
 import '../achievements/achievement_unlocked_dialog.dart';
 
+enum MovieDetailsOrigin { none, random, smart }
+
 class MovieDetailsScreen extends StatefulWidget {
   final Movie movie;
+  final MovieDetailsOrigin origin;
+  final Future<Movie?> Function()? onReshuffle;
 
   const MovieDetailsScreen({
     super.key,
     required this.movie,
+    this.origin = MovieDetailsOrigin.none,
+    this.onReshuffle,
   });
 
   @override
