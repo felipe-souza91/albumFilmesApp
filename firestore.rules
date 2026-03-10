@@ -40,14 +40,21 @@ service cloud.firestore {
     }
 
     match /user_achievements/{docId} {
-      allow read: if isOwner('userId');
+      allow read: if isAuth() && (
+        (resource != null && request.auth.uid == resource.data.userId) ||
+        (resource == null && docId.matches('^' + request.auth.uid + '_.*$'))
+      );
       allow create, update, delete: if isOwnerReq('userId');
     }
 
     match /user_metrics/{docId} {
-          allow read: if isOwner('userId');
-          allow create, update, delete: if isOwnerReq('userId');
-        }
+      // Permite get() de métricas ainda não criadas (ex.: shares = 0)
+      allow read: if isAuth() && (
+        (resource != null && request.auth.uid == resource.data.userId) ||
+        (resource == null && docId.matches('^' + request.auth.uid + '_.*$'))
+      );
+      allow create, update, delete: if isOwnerReq('userId');
+    }
 
     match /questionnaires/{version} {
       allow read: if true;
