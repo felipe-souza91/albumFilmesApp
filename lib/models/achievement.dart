@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 // lib/models/achievement.dart
 class Achievement {
   final String id;
@@ -69,9 +71,11 @@ class UserAchievement {
       unlocked: json['unlocked'] ?? false,
       progress: json['progress'] ?? 0,
       unlockedAt: json['unlockedAt'] != null
-          ? (json['unlockedAt'] is DateTime
-              ? json['unlockedAt']
-              : DateTime.parse(json['unlockedAt']))
+          ? (json['unlockedAt'] is Timestamp
+              ? (json['unlockedAt'] as Timestamp).toDate()
+              : json['unlockedAt'] is DateTime
+                  ? json['unlockedAt']
+                  : DateTime.parse(json['unlockedAt']))
           : null,
     );
   }

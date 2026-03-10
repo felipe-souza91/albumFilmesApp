@@ -1,5 +1,6 @@
 import 'package:album_filmes_app/providers/movie_provider.dart';
 import 'package:album_filmes_app/services/carrega_movies.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -10,6 +11,8 @@ import 'views/auth/login_screen.dart';
 import 'views/auth/signup_screen.dart';
 import 'views/home/home_screen.dart';
 import 'profile/profile_screen.dart';
+import 'controllers/achievement_controller.dart';
+import 'services/firestore_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // <- TEM que vir primeiro
@@ -34,6 +37,8 @@ void main() async {
     //print("Erro ao inicializar Firebase: $e");
   }
 
+  await _seedAchievementsIfAdmin();
+
   runApp(
     MultiProvider(
       providers: [
@@ -42,6 +47,23 @@ void main() async {
       child: MyApp(),
     ),
   );
+}
+
+Future<void> _seedAchievementsIfAdmin() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final tokenResult = await user.getIdTokenResult(true);
+    final isAdmin = tokenResult.claims?['admin'] == true;
+    if (!isAdmin) return;
+
+    final achievementController =
+        AchievementController(firestoreService: FirestoreService());
+    await achievementController.setupInitialAchievements();
+  } catch (_) {
+    // evita ruído no startup; seed de achievements é responsabilidade administrativa
+  }
 }
 
 class MyApp extends StatelessWidget {

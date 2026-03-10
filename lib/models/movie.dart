@@ -7,6 +7,9 @@ class Movie {
   final List<String> platforms;
   final DateTime releaseDate;
   final List<String> keywords;
+  final List<String> productionCountries;
+  final String director;
+  final String originalLanguage;
   final String posterUrl;
   final bool isWatched;
   final double rating;
@@ -19,6 +22,9 @@ class Movie {
     required this.platforms,
     required this.releaseDate,
     required this.keywords,
+    this.productionCountries = const [],
+    this.director = '',
+    this.originalLanguage = '',
     required this.posterUrl,
     this.isWatched = false,
     this.rating = 0.0,
@@ -35,6 +41,9 @@ class Movie {
           ? DateTime.tryParse(json['releaseDate']) ?? DateTime(2000)
           : DateTime(2000),
       keywords: List<String>.from(json['keywords'] ?? []),
+      productionCountries: List<String>.from(json['productionCountries'] ?? []),
+      director: json['director'] ?? '',
+      originalLanguage: json['originalLanguage'] ?? '',
       posterUrl: json['posterUrl'] ?? '',
       isWatched: json['isWatched'] ?? false,
       rating: (json['rating'] ?? 0.0).toDouble(),
@@ -50,6 +59,9 @@ class Movie {
       'platforms': platforms,
       'releaseDate': releaseDate.toIso8601String(),
       'keywords': keywords,
+      'productionCountries': productionCountries,
+      'director': director,
+      'originalLanguage': originalLanguage,
       'posterUrl': posterUrl,
       'isWatched': isWatched,
       'rating': rating,
@@ -64,6 +76,9 @@ class Movie {
     List<String>? platforms,
     DateTime? releaseDate,
     List<String>? keywords,
+    List<String>? productionCountries,
+    String? director,
+    String? originalLanguage,
     String? posterUrl,
     bool? isWatched,
     double? rating,
@@ -76,6 +91,9 @@ class Movie {
       platforms: platforms ?? this.platforms,
       releaseDate: releaseDate ?? this.releaseDate,
       keywords: keywords ?? this.keywords,
+      productionCountries: productionCountries ?? this.productionCountries,
+      director: director ?? this.director,
+      originalLanguage: originalLanguage ?? this.originalLanguage,
       posterUrl: posterUrl ?? this.posterUrl,
       isWatched: isWatched ?? this.isWatched,
       rating: rating ?? this.rating,

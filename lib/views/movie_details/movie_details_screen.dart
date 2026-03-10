@@ -229,9 +229,13 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
   void _shareViaWhatsApp() async {
     final text =
         'Acabei de assistir ${widget.movie.title} e dei ${_rating.toString()} estrelas! #MovieAlbum';
+    final userId = FirebaseAuth.instance.currentUser?.uid;
 
     try {
       await Share.share(text, subject: 'Compartilhar via WhatsApp');
+      if (userId != null) {
+        await _firestoreService.incrementUserMetric(userId, 'shares');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

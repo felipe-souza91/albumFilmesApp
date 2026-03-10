@@ -9,6 +9,7 @@ class FirestoreService {
   final String userMoviesCollection = 'user_movies';
   final String achievementsCollection = 'achievements';
   final String userAchievementsCollection = 'user_achievements';
+  final String userMetricsCollection = 'user_metrics';
 
   FirebaseFirestore get firestore => _firestore;
 
@@ -223,5 +224,49 @@ class FirestoreService {
       //print('Error updating achievement progress: $e');
       rethrow;
     }
+  }
+
+  Future<int> getWeekendWatchedCount(String userId) async {
+    final snapshot = await _firestore
+        .collection(userMoviesCollection)
+        .where('userId', isEqualTo: userId)
+        .where('watched', isEqualTo: true)
+        .get();
+
+    var count = 0;
+    for (final doc in snapshot.docs) {
+      final watchedDate = doc.data()['watchedDate'];
+      if (watchedDate is Timestamp) {
+        final dt = watchedDate.toDate();
+        if (dt.weekday == DateTime.saturday || dt.weekday == DateTime.sunday) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  Future<void> incrementUserMetric(String userId, String metric,
+      {int by = 1}) async {
+    final ref =
+        _firestore.collection(userMetricsCollection).doc('${userId}_$metric');
+    await ref.set({
+      'userId': userId,
+      'metric': metric,
+      'count': FieldValue.increment(by),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<int> getUserMetricCount(String userId, String metric) async {
+    final ref =
+        _firestore.collection(userMetricsCollection).doc('${userId}_$metric');
+    final snap = await ref.get();
+    if (!snap.exists) return 0;
+    final data = snap.data();
+    final count = data?['count'];
+    if (count is int) return count;
+    if (count is num) return count.toInt();
+    return 0;
   }
 }

@@ -236,7 +236,7 @@ class AchievementController {
         'iconUrl': 'assets/icons/achievements/projector.png',
         'category': 'special',
         'ruleType': 'before_year',
-        'ruleValue': 1950,
+        'ruleValue': 1,
         'ruleCriteria': {'type': 'before_year', 'year': 1950},
       },
       {
@@ -350,6 +350,94 @@ class AchievementController {
         userId, 'classic_rediscovered', countBefore1950);
 
     // TODO: global_cinema, social e outras conquistas especiais
+    // 4) Diretores e franquias
+    int tarantinoCount = 0;
+    int lotrCount = 0;
+    int madMaxCount = 0;
+
+    for (final movie in watchedMovies) {
+      final title = movie.title.toLowerCase();
+      final director = movie.director.toLowerCase();
+
+      if (director.contains('quentin tarantino')) {
+        tarantinoCount++;
+      }
+
+      if (title.contains('senhor dos anéis') ||
+          title.contains('the lord of the rings') ||
+          title.contains('o hobbit') ||
+          title.contains('the hobbit')) {
+        lotrCount++;
+      }
+
+      if (title.contains('mad max')) {
+        madMaxCount++;
+      }
+    }
+
+    await unlockIf(tarantinoCount >= 5, 'tarantino_fan');
+    await unlockIf(lotrCount >= 3, 'lotr_fan');
+    await unlockIf(madMaxCount >= 4, 'mad_max_fan');
+
+    await firestoreService.updateAchievementProgress(
+        userId, 'tarantino_fan', tarantinoCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'lotr_fan', lotrCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'mad_max_fan', madMaxCount);
+
+    // 5) Origem global
+    final uniqueOrigins = <String>{};
+    for (final movie in watchedMovies) {
+      for (final country in movie.productionCountries) {
+        final clean = country.trim();
+        if (clean.isNotEmpty) uniqueOrigins.add(clean);
+      }
+
+      if (movie.productionCountries.isEmpty &&
+          movie.originalLanguage.trim().isNotEmpty) {
+        uniqueOrigins
+            .add('lang:${movie.originalLanguage.trim().toLowerCase()}');
+      }
+    }
+
+    final globalCinemaProgress = uniqueOrigins.length;
+    await unlockIf(globalCinemaProgress >= 5, 'global_cinema');
+    await firestoreService.updateAchievementProgress(
+        userId, 'global_cinema', globalCinemaProgress);
+
+    // 6) Sociais e especiais
+    final sharesCount =
+        await firestoreService.getUserMetricCount(userId, 'shares');
+    final ratedCount = watchedMovies.where((m) => m.rating > 0).length;
+
+    final weekendCount = await firestoreService.getWeekendWatchedCount(userId);
+
+    int indieCount = 0;
+    for (final movie in watchedMovies) {
+      final keywordsLower = movie.keywords.map((k) => k.toLowerCase()).toList();
+      if (keywordsLower
+          .any((k) => k.contains('indie') || k.contains('independente'))) {
+        indieCount++;
+      }
+    }
+
+    await unlockIf(sharesCount >= 5, 'cinema_ambassador');
+    await unlockIf(ratedCount >= 10, 'classics_curator');
+    await unlockIf(ratedCount >= 20, 'born_critic');
+    await unlockIf(weekendCount >= 5, 'weekend_marathon');
+    await unlockIf(indieCount >= 5, 'indie_explorer');
+
+    await firestoreService.updateAchievementProgress(
+        userId, 'cinema_ambassador', sharesCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'classics_curator', ratedCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'born_critic', ratedCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'weekend_marathon', weekendCount);
+    await firestoreService.updateAchievementProgress(
+        userId, 'indie_explorer', indieCount);
 
     return newlyUnlocked;
   }

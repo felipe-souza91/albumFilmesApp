@@ -23,7 +23,7 @@ class AchievementsScreenState extends State<AchievementsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
     _loadAchievements();
   }
 
@@ -94,9 +94,12 @@ class AchievementsScreenState extends State<AchievementsScreen>
   void _shareAchievement(Achievement achievement) async {
     final text =
         'Desbloqueei a conquista "${achievement.name}" no Movie Album! ${achievement.description}';
-
+    final userId = FirebaseAuth.instance.currentUser?.uid;
     try {
       await Share.share(text, subject: 'Compartilhar via WhatsApp');
+      if (userId != null) {
+        await _firestoreService.incrementUserMetric(userId, 'shares');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,6 +132,7 @@ class AchievementsScreenState extends State<AchievementsScreen>
             Tab(text: 'Gêneros'),
             Tab(text: 'Diretores/Franquias'),
             Tab(text: 'Época/Origem'),
+            Tab(text: 'Social'),
             Tab(text: 'Especiais'),
           ],
         ),
@@ -171,6 +175,13 @@ class AchievementsScreenState extends State<AchievementsScreen>
                 _buildAchievementsList(_achievements
                     .where(
                       (a) => a.category == 'era' || a.category == 'origin',
+                    )
+                    .toList()),
+
+                // Conquistas sociais
+                _buildAchievementsList(_achievements
+                    .where(
+                      (a) => a.category == 'social',
                     )
                     .toList()),
 

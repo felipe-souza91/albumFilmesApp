@@ -33,7 +33,7 @@ class TMDBService {
   Future<Map<String, dynamic>> getMovieDetails(int movieId) async {
     final response = await http.get(
       Uri.parse(
-          '$baseUrl/movie/$movieId?api_key=$apiKey&language=$language&append_to_response=keywords,watch/providers'),
+          '$baseUrl/movie/$movieId?api_key=$apiKey&language=$language&append_to_response=keywords,watch/providers,credits'),
       headers: {
         'Authorization': 'Bearer $apiToken',
         'Content-Type': 'application/json',
@@ -113,6 +113,16 @@ class TMDBService {
   }
 
   Map<String, dynamic> transformMovieData(Map<String, dynamic> movieData) {
+    final List<dynamic> countries = movieData['production_countries'] ?? [];
+    final List<dynamic> crew =
+        (movieData['credits']?['crew'] ?? []) as List<dynamic>;
+    String director = '';
+    for (final person in crew) {
+      if (person['job'] == 'Director') {
+        director = (person['name'] ?? '').toString();
+        break;
+      }
+    }
     return {
       'id': movieData['id'],
       'title': movieData['title'],
@@ -121,6 +131,12 @@ class TMDBService {
       'platforms': extractPlatforms(movieData),
       'releaseDate': movieData['release_date'],
       'keywords': extractKeywords(movieData),
+      'productionCountries': countries
+          .map((c) => (c['name'] ?? '').toString())
+          .where((c) => c.isNotEmpty)
+          .toList(),
+      'director': director,
+      'originalLanguage': (movieData['original_language'] ?? '').toString(),
       'posterUrl': movieData['poster_path'] != null
           ? 'https://image.tmdb.org/t/p/w500${movieData['poster_path']}'
           : '',
