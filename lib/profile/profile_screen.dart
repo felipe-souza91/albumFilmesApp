@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,16 +6,253 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../views/auth/login_screen.dart';
 import 'preferences_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+
+  bool _isSaving = false;
+  String _displayName = '';
+  String _photoUrl = '';
+
+  User? get _user => _auth.currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final user = _user;
+    if (user == null) return;
+
+    setState(() {
+      _displayName = user.displayName ?? '';
+      _photoUrl = user.photoURL ?? '';
+    });
+
+    try {
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      final data = doc.data();
+      if (!mounted || data == null) return;
+
+      setState(() {
+        _displayName = (data['name'] ?? _displayName).toString();
+        _photoUrl = (data['photoUrl'] ?? _photoUrl).toString();
+      });
+    } catch (_) {
+      // mantém fallback do Auth
+    }
+  }
+
+  Future<void> _updateProfile({String? name, String? photoUrl}) async {
+    final user = _user;
+    if (user == null) return;
+
+    setState(() => _isSaving = true);
+    try {
+      final newName = (name ?? _displayName).trim();
+      final newPhoto = (photoUrl ?? _photoUrl).trim();
+
+      await user.updateDisplayName(newName.isEmpty ? null : newName);
+      await user.updatePhotoURL(newPhoto.isEmpty ? null : newPhoto);
+
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': newName,
+        'email': user.email,
+        'photoUrl': newPhoto,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      setState(() {
+        _displayName = newName;
+        _photoUrl = newPhoto;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Perfil atualizado com sucesso!')),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao atualizar perfil: ${e.message}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível atualizar o perfil.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _showEditNameDialog() async {
+    final controller = TextEditingController(text: _displayName);
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Editar nome'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Seu nome'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _updateProfile(name: controller.text);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPhotoUrlDialog() async {
+    final controller = TextEditingController(text: _photoUrl);
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Adicionar/alterar foto (URL)'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'https://...'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _updateProfile(photoUrl: controller.text);
+            },
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _removePhoto() async {
+    await _updateProfile(photoUrl: '');
+  }
+
+  Future<void> _changePasswordDialog() async {
+    final currentController = TextEditingController();
+    final newController = TextEditingController();
+    final confirmController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Alterar senha'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: currentController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Senha atual'),
+            ),
+            TextField(
+              controller: newController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Nova senha'),
+            ),
+            TextField(
+              controller: confirmController,
+              obscureText: true,
+              decoration:
+                  const InputDecoration(labelText: 'Confirmar nova senha'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final current = currentController.text.trim();
+              final next = newController.text.trim();
+              final confirm = confirmController.text.trim();
+
+              if (next.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content:
+                          Text('Nova senha deve ter ao menos 6 caracteres.')),
+                );
+                return;
+              }
+              if (next != confirm) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Confirmação de senha não confere.')),
+                );
+                return;
+              }
+
+              final user = _user;
+              if (user == null || user.email == null) return;
+
+              try {
+                final credential = EmailAuthProvider.credential(
+                  email: user.email!,
+                  password: current,
+                );
+                await user.reauthenticateWithCredential(credential);
+                await user.updatePassword(next);
+
+                if (!mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Senha alterada com sucesso!')),
+                );
+              } on FirebaseAuthException catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          e.message ?? 'Não foi possível alterar a senha.')),
+                );
+              }
+            },
+            child: const Text('Alterar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final email = _user?.email ?? 'Sem e-mail';
+
     return Scaffold(
-      backgroundColor: Color(0xFF0D1B2A),
+      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
-        title: Text(
-          "Minha Conta",
+        backgroundColor: const Color.fromRGBO(11, 18, 34, 1.0),
+        title: const Text(
+          'Minha Conta',
           style: TextStyle(color: Color(0xFFFFD700)),
         ),
         leading: IconButton(
@@ -23,42 +261,86 @@ class ProfileScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          children: [
-            const ProfilePic(),
-            const SizedBox(height: 20),
-            ProfileMenu(
-              text: "Minha conta",
-              iconData: Icons.person,
-              press: () => {},
-            ),
-            ProfileMenu(
-              text: "Preferências",
-              iconData: Icons.settings,
-              press: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const PreferencesScreen(),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              children: [
+                ProfilePic(
+                  photoUrl: _photoUrl,
+                  onChangePhoto: _showPhotoUrlDialog,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _displayName.isEmpty ? 'Usuário' : _displayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
-                );
-              },
+                ),
+                Text(
+                  email,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 20),
+                ProfileMenu(
+                  text: 'Editar nome',
+                  iconData: Icons.badge,
+                  press: _showEditNameDialog,
+                ),
+                ProfileMenu(
+                  text: 'Adicionar/Alterar foto',
+                  iconData: Icons.photo_camera,
+                  press: _showPhotoUrlDialog,
+                ),
+                ProfileMenu(
+                  text: 'Remover foto',
+                  iconData: Icons.delete_outline,
+                  press: _removePhoto,
+                ),
+                ProfileMenu(
+                  text: 'Alterar senha',
+                  iconData: Icons.lock_reset,
+                  press: _changePasswordDialog,
+                ),
+                ProfileMenu(
+                  text: 'Preferências',
+                  iconData: Icons.settings,
+                  press: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PreferencesScreen(),
+                      ),
+                    );
+                  },
+                ),
+                ProfileMenu(
+                  text: 'Log Out',
+                  iconData: Icons.logout,
+                  press: () async {
+                    await FirebaseAuth.instance.signOut();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ],
             ),
-            ProfileMenu(
-              text: "Log Out",
-              iconData: Icons.logout,
-              press: () async {
-                await FirebaseAuth.instance.signOut();
-                if (!context.mounted) return; // se você transformar em Stateful
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
-              },
+          ),
+          if (_isSaving)
+            Container(
+              color: Colors.black38,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                ),
+              ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -67,10 +349,21 @@ class ProfileScreen extends StatelessWidget {
 class ProfilePic extends StatelessWidget {
   const ProfilePic({
     super.key,
+    required this.photoUrl,
+    required this.onChangePhoto,
   });
+
+  final String photoUrl;
+  final VoidCallback onChangePhoto;
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider imageProvider;
+    if (photoUrl.trim().isNotEmpty) {
+      imageProvider = NetworkImage(photoUrl.trim());
+    } else {
+      imageProvider = const AssetImage('assets/icons/user.jpg');
+    }
     return SizedBox(
       height: 115,
       width: 115,
@@ -78,9 +371,7 @@ class ProfilePic extends StatelessWidget {
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
-          const CircleAvatar(
-            backgroundImage: AssetImage("assets/icons/user.jpg"),
-          ),
+          CircleAvatar(backgroundImage: imageProvider),
           Positioned(
             right: -16,
             bottom: 0,
@@ -89,14 +380,14 @@ class ProfilePic extends StatelessWidget {
               width: 46,
               child: TextButton(
                 style: TextButton.styleFrom(
-                  foregroundColor: Color.fromRGBO(11, 18, 34, 1.0),
+                  foregroundColor: const Color.fromRGBO(11, 18, 34, 1.0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(50),
                     side: const BorderSide(color: Colors.white),
                   ),
                   backgroundColor: const Color(0xFFF5F6F9),
                 ),
-                onPressed: () {},
+                onPressed: onChangePhoto,
                 child: SvgPicture.string(cameraIcon),
               ),
             ),
