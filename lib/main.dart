@@ -13,6 +13,8 @@ import 'views/home/home_screen.dart';
 import 'profile/profile_screen.dart';
 import 'controllers/achievement_controller.dart';
 import 'services/firestore_service.dart';
+import 'services/config.dart';
+import 'services/ads_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized(); // <- TEM que vir primeiro
@@ -38,6 +40,7 @@ void main() async {
   }
 
   await _seedAchievementsIfAdmin();
+  await _initAds();
 
   runApp(
     MultiProvider(
@@ -47,6 +50,19 @@ void main() async {
       child: MyApp(),
     ),
   );
+}
+
+Future<void> _initAds() async {
+  try {
+    if (!Config.adsEnabled) return;
+    await AdsService.instance.init();
+    if (Config.admobInterstitialUnitId.isNotEmpty) {
+      await AdsService.instance
+          .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
+    }
+  } catch (_) {
+    // Não bloquear bootstrap por falha de ads
+  }
 }
 
 Future<void> _seedAchievementsIfAdmin() async {

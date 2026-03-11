@@ -8,6 +8,8 @@ import '../../models/movie.dart';
 import '../../models/achievement.dart';
 import '../../providers/movie_provider.dart';
 import '../../services/firestore_service.dart';
+import '../../services/config.dart';
+import '../../services/ads_service.dart';
 import '../../widgets/rating_stars.dart';
 import '../../widgets/scratch_poster.dart';
 
@@ -114,11 +116,16 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       final achievementController =
           AchievementController(firestoreService: _firestoreService);
 
-      final newlyUnlockedIds = await achievementController.checkAchievements(
-        userId,
-        watchedIds,
-        watchedMovies,
-      );
+      List<String> newlyUnlockedIds = const [];
+      try {
+        newlyUnlockedIds = await achievementController.checkAchievements(
+          userId,
+          watchedIds,
+          watchedMovies,
+        );
+      } catch (_) {
+        // Não bloquear o fluxo principal de marcar assistido por falha em conquistas
+      }
 
       // Feedback padrão
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,6 +134,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
       // 🎉 Pop-up de conquistas desbloqueadas agora
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
+
+      // 🚀 Exibir anúncio intersticial após marcar como assistido (se habilitado)
+      await _tryShowInterstitial();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -139,6 +149,19 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _tryShowInterstitial() async {
+    try {
+      if (!Config.adsEnabled) return;
+      if (Config.admobInterstitialUnitId.isEmpty) return;
+
+      await AdsService.instance.showInterstitial();
+      await AdsService.instance
+          .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
+    } catch (_) {
+      // Não bloquear UX por falha de ads
     }
   }
 

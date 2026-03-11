@@ -18,4 +18,21 @@ class Config {
       const String.fromEnvironment('FLAVOR', defaultValue: 'prod');
 
   static bool get isProd => flavor == 'prod';
+
+  static String get admobAndroidInterstitialUnitId =>
+      const String.fromEnvironment(
+        'ADMOB_ANDROID_INTERSTITIAL_ID',
+        defaultValue: 'ca-app-pub-3940256099942544/1033173712',
+      );
+
+  static String get admobIosInterstitialUnitId => const String.fromEnvironment(
+        'ADMOB_IOS_INTERSTITIAL_ID',
+        defaultValue: 'ca-app-pub-3940256099942544/4411468910',
+      );
+
+  static String get admobInterstitialUnitId {
+    if (Platform.isAndroid) return admobAndroidInterstitialUnitId;
+    if (Platform.isIOS) return admobIosInterstitialUnitId;
+    return '';
+  }
 }
