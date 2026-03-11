@@ -28,6 +28,7 @@ dependencies:
   firebase_analytics: ^11.0.0
   google_mobile_ads: ^5.0.0
   shared_preferences: ^2.2.0
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +50,7 @@ flutter:
   assets:
     - assets/icons/user.jpg
     - assets/icons/splash.png
+    - assets/icons/achievements/
     - assets/logo.png
     - assets/logo_tiny.png
     - assets/.env

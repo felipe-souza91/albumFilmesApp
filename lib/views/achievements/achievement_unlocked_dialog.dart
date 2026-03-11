@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../services/achievement_share_service.dart';
 import '../../models/achievement.dart';
 
 class AchievementUnlockedDialog extends StatelessWidget {
@@ -7,10 +7,48 @@ class AchievementUnlockedDialog extends StatelessWidget {
 
   const AchievementUnlockedDialog({super.key, required this.achievement});
 
-  void _share() {
-    final text =
-        '🏆 Desbloqueei a conquista "${achievement.name}" no Movie Album!\n\n${achievement.description}';
-    Share.share(text);
+  Future<void> _share(BuildContext context) async {
+    try {
+      await AchievementShareService.shareAchievement(achievement);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao compartilhar: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildIcon() {
+    final iconUrl = achievement.iconUrl.trim();
+
+    if (iconUrl.startsWith('assets/')) {
+      return ClipOval(
+        child: Image.asset(
+          iconUrl,
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events,
+              color: Color(0xFFFFD700), size: 48),
+        ),
+      );
+    }
+
+    if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://')) {
+      return ClipOval(
+        child: Image.network(
+          iconUrl,
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events,
+              color: Color(0xFFFFD700), size: 48),
+        ),
+      );
+    }
+
+    return const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 48);
   }
 
   @override
@@ -23,7 +61,7 @@ class AchievementUnlockedDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 48),
+            _buildIcon(),
             const SizedBox(height: 12),
             const Text(
               'Conquista desbloqueada!',
@@ -70,7 +108,7 @@ class AchievementUnlockedDialog extends StatelessWidget {
                       backgroundColor: const Color(0xFFFFD700),
                       foregroundColor: const Color(0xFF0D1B2A),
                     ),
-                    onPressed: _share,
+                    onPressed: () => _share(context),
                     icon: const Icon(Icons.share),
                     label: const Text('Compartilhar'),
                   ),

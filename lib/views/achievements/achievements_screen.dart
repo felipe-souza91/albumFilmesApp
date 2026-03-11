@@ -1,8 +1,8 @@
 // lib/views/achievements/achievements_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../models/achievement.dart';
+import '../../services/achievement_share_service.dart';
 import '../../services/firestore_service.dart';
 
 class AchievementsScreen extends StatefulWidget {
@@ -86,17 +86,15 @@ class AchievementsScreenState extends State<AchievementsScreen>
       return _userAchievements.firstWhere(
         (ua) => ua.achievementId == achievementId,
       );
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  void _shareAchievement(Achievement achievement) async {
-    final text =
-        'Desbloqueei a conquista "${achievement.name}" no Movie Album! ${achievement.description}';
+  Future<void> _shareAchievement(Achievement achievement) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     try {
-      await Share.share(text, subject: 'Compartilhar via WhatsApp');
+      await AchievementShareService.shareAchievement(achievement);
       if (userId != null) {
         await _firestoreService.incrementUserMetric(userId, 'shares');
       }
@@ -109,24 +107,60 @@ class AchievementsScreenState extends State<AchievementsScreen>
     }
   }
 
+  Widget _buildAchievementIcon(Achievement achievement, bool isUnlocked) {
+    final iconUrl = achievement.iconUrl.trim();
+    final bgColor = isUnlocked ? const Color(0xFFFFD700) : Colors.grey;
+    final fallbackColor = isUnlocked ? const Color(0xFF0D1B2A) : Colors.white54;
+
+    Widget child;
+    if (iconUrl.startsWith('assets/')) {
+      child = Image.asset(
+        iconUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            Icon(Icons.emoji_events, color: fallbackColor, size: 30),
+      );
+    } else if (iconUrl.startsWith('http://') ||
+        iconUrl.startsWith('https://')) {
+      child = Image.network(
+        iconUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            Icon(Icons.emoji_events, color: fallbackColor, size: 30),
+      );
+    } else {
+      child = Icon(Icons.emoji_events, color: fallbackColor, size: 30);
+    }
+
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(child: child),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF0D1B2A),
+      backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Color(0xFFFFD700)),
+        iconTheme: IconThemeData(color: const Color(0xFFFFD700)),
         title: Text(
           'Conquistas',
-          style: TextStyle(color: Color(0xFFFFD700)),
+          style: TextStyle(color: const Color(0xFFFFD700)),
         ),
-        backgroundColor: Color.fromRGBO(11, 18, 34, 1.0),
+        backgroundColor: const Color.fromRGBO(11, 18, 34, 1.0),
         bottom: TabBar(
           unselectedLabelColor: Colors.white,
-          labelColor: Color(0xFFFFD700),
+          labelColor: const Color(0xFFFFD700),
           controller: _tabController,
           isScrollable: true,
-          indicatorColor: Color(0xFFFFD700),
-          tabs: [
+          indicatorColor: const Color(0xFFFFD700),
+          tabs: const [
             Tab(text: 'Todas'),
             Tab(text: 'Quantidade'),
             Tab(text: 'Gêneros'),
@@ -138,7 +172,7 @@ class AchievementsScreenState extends State<AchievementsScreen>
         ),
       ),
       body: _isLoading
-          ? Center(
+          ? const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
               ),
@@ -151,17 +185,10 @@ class AchievementsScreenState extends State<AchievementsScreen>
 
                 // Conquistas por quantidade
                 _buildAchievementsList(_achievements
-                    .where(
-                      (a) => a.category == 'quantity',
-                    )
+                    .where((a) => a.category == 'quantity')
                     .toList()),
-
-                // Conquistas por gênero
-                _buildAchievementsList(_achievements
-                    .where(
-                      (a) => a.category == 'genre',
-                    )
-                    .toList()),
+                _buildAchievementsList(
+                    _achievements.where((a) => a.category == 'genre').toList()),
 
                 // Conquistas por diretor/franquia
                 _buildAchievementsList(_achievements
@@ -198,7 +225,7 @@ class AchievementsScreenState extends State<AchievementsScreen>
 
   Widget _buildAchievementsList(List<Achievement> achievements) {
     if (achievements.isEmpty) {
-      return Center(
+      return const Center(
         child: Text(
           'Nenhuma conquista disponível nesta categoria',
           style: TextStyle(color: Colors.white),
@@ -207,7 +234,7 @@ class AchievementsScreenState extends State<AchievementsScreen>
     }
 
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       itemCount: achievements.length,
       itemBuilder: (context, index) {
         final achievement = achievements[index];
@@ -215,33 +242,21 @@ class AchievementsScreenState extends State<AchievementsScreen>
         final userAchievement = _getUserAchievement(achievement.id);
 
         return Card(
-          margin: EdgeInsets.only(bottom: 16),
-          color: isUnlocked ? Color(0xFF0047AB) : Colors.grey[800],
+          margin: const EdgeInsets.only(bottom: 16),
+          color: isUnlocked ? const Color(0xFF0047AB) : Colors.grey[800],
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
             side: BorderSide(
-              color: isUnlocked ? Color(0xFFFFD700) : Colors.transparent,
+              color: isUnlocked ? const Color(0xFFFFD700) : Colors.transparent,
               width: 2,
             ),
           ),
           child: ListTile(
-            contentPadding: EdgeInsets.all(16),
-            leading: Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: isUnlocked ? Color(0xFFFFD700) : Colors.grey,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.emoji_events,
-                color: isUnlocked ? Color(0xFF0D1B2A) : Colors.white54,
-                size: 30,
-              ),
-            ),
+            contentPadding: const EdgeInsets.all(16),
+            leading: _buildAchievementIcon(achievement, isUnlocked),
             title: Text(
               achievement.name,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
@@ -250,29 +265,29 @@ class AchievementsScreenState extends State<AchievementsScreen>
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   achievement.description,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 if (!isUnlocked && userAchievement != null)
                   LinearProgressIndicator(
                     value: userAchievement.progress /
                         (achievement.ruleValue as int),
                     backgroundColor: Colors.grey[700],
                     valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                        const AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
                   ),
                 if (isUnlocked)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton.icon(
-                        icon: Icon(Icons.share, color: Colors.white),
-                        label: Text(
+                        icon: const Icon(Icons.share, color: Colors.white),
+                        label: const Text(
                           'Compartilhar',
                           style: TextStyle(color: Colors.white),
                         ),
