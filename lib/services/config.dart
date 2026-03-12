@@ -19,6 +19,14 @@ class Config {
 
   static bool get isProd => flavor == 'prod';
 
+  static bool get useTestAds =>
+      const bool.fromEnvironment('USE_TEST_ADS', defaultValue: false);
+
+  static const String _googleTestAndroidInterstitialId =
+      'ca-app-pub-3940256099942544/1033173712';
+  static const String _googleTestIosInterstitialId =
+      'ca-app-pub-3940256099942544/4411468910';
+
   static String get admobAndroidInterstitialUnitId =>
       const String.fromEnvironment(
         'ADMOB_ANDROID_INTERSTITIAL_ID',
@@ -40,8 +48,16 @@ class Config {
       .toList();
 
   static String get admobInterstitialUnitId {
-    if (Platform.isAndroid) return admobAndroidInterstitialUnitId;
-    if (Platform.isIOS) return admobIosInterstitialUnitId;
+    if (Platform.isAndroid) {
+      return useTestAds
+          ? _googleTestAndroidInterstitialId
+          : admobAndroidInterstitialUnitId;
+    }
+    if (Platform.isIOS) {
+      return useTestAds
+          ? _googleTestIosInterstitialId
+          : admobIosInterstitialUnitId;
+    }
     return '';
   }
 }

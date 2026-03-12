@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
@@ -54,14 +55,34 @@ class AdsService {
     await prefs.setInt(_kPrefsCountKey, count);
   }
 
-  Future<void> loadInterstitial({required String adUnitId}) async {
+  Future<void> loadInterstitial({
+    required String adUnitId,
+    int attempt = 1,
+  }) async {
     if (!Config.adsEnabled) return;
+
     await InterstitialAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitial = ad,
-        onAdFailedToLoad: (err) => _interstitial = null,
+        onAdLoaded: (ad) {
+          _interstitial = ad;
+          debugPrint('[Ads] Interstitial carregado (attempt=$attempt).');
+        },
+        onAdFailedToLoad: (err) {
+          _interstitial = null;
+          debugPrint(
+            '[Ads] Falha ao carregar interstitial '
+            '(code=${err.code}, message=${err.message}, attempt=$attempt).',
+          );
+
+          if (attempt < 2) {
+            Future<void>.delayed(
+              const Duration(seconds: 2),
+              () => loadInterstitial(adUnitId: adUnitId, attempt: attempt + 1),
+            );
+          }
+        },
       ),
     );
   }
