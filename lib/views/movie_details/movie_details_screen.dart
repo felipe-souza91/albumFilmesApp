@@ -1,4 +1,5 @@
 // lib/views/movie_details/movie_details_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -136,7 +137,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
 
       // 🚀 Exibir anúncio intersticial após marcar como assistido (se habilitado)
-      await _tryShowInterstitial();
+      unawaited(_tryShowInterstitial());
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
