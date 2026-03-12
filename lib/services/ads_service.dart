@@ -20,6 +20,13 @@ class AdsService {
     if (_initialized) return;
     if (!Config.adsEnabled) return; // <- garante que não inicializa sem Ads
     await MobileAds.instance.initialize();
+
+    if (Config.admobTestDeviceIds.isNotEmpty) {
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(testDeviceIds: Config.admobTestDeviceIds),
+      );
+    }
+
     _initialized = true;
   }
 
