@@ -40,7 +40,7 @@ void main() async {
   }
 
   await _seedAchievementsIfAdmin();
-  await _initAds();
+  //await _initAds();
 
   runApp(
     MultiProvider(

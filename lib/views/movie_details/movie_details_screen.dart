@@ -157,6 +157,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       if (!Config.adsEnabled) return;
       if (Config.admobInterstitialUnitId.isEmpty) return;
 
+      await AdsService.instance.init();
       await AdsService.instance.showInterstitial();
       await AdsService.instance
           .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
