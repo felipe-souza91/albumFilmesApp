@@ -46,6 +46,20 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
     super.initState();
     _isWatched = widget.movie.isWatched;
     _rating = widget.movie.rating;
+    unawaited(_preloadInterstitialIfNeeded());
+  }
+
+  Future<void> _preloadInterstitialIfNeeded() async {
+    try {
+      if (!Config.adsEnabled) return;
+      if (Config.admobInterstitialUnitId.isEmpty) return;
+
+      await AdsService.instance.init();
+      await AdsService.instance
+          .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
+    } catch (_) {
+      // Não bloquear abertura da tela por falha de ads
+    }
   }
 
   Future<void> _showUnlockedAchievementsPopup(List<String> unlockedIds) async {
