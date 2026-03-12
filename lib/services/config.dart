@@ -22,7 +22,7 @@ class Config {
   static String get admobAndroidInterstitialUnitId =>
       const String.fromEnvironment(
         'ADMOB_ANDROID_INTERSTITIAL_ID',
-        defaultValue: 'ca-app-pub-3940256099942544/1033173712',
+        defaultValue: 'ca-app-pub-4122049387504802/3096864489',
       );
 
   static String get admobIosInterstitialUnitId => const String.fromEnvironment(

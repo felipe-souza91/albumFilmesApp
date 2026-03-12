@@ -28,7 +28,6 @@ class ApiService {
   }
 
   Future<List<dynamic>> getTopRatedMovies() async {
-    // exemplo
     final response = await http.get(
       Uri.parse('$baseUrl/movie/top_rated?api_key=$_apiKey&language=pt-BR'),
       headers: _buildHeaders(),

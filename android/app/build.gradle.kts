@@ -28,6 +28,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders["ADMOB_APP_ID"] =
+            (project.findProperty("ADMOB_APP_ID") as String?)
+                ?: "ca-app-pub-4122049387504802~6761252681"
     }
 
     buildTypes {
