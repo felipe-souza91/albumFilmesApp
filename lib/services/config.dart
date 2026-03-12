@@ -30,6 +30,15 @@ class Config {
         defaultValue: 'ca-app-pub-3940256099942544/4411468910',
       );
 
+  static String get admobTestDeviceIdsCsv =>
+      const String.fromEnvironment('ADMOB_TEST_DEVICE_IDS', defaultValue: '');
+
+  static List<String> get admobTestDeviceIds => admobTestDeviceIdsCsv
+      .split(',')
+      .map((id) => id.trim())
+      .where((id) => id.isNotEmpty)
+      .toList();
+
   static String get admobInterstitialUnitId {
     if (Platform.isAndroid) return admobAndroidInterstitialUnitId;
     if (Platform.isIOS) return admobIosInterstitialUnitId;
