@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../views/auth/login_screen.dart';
 import 'preferences_screen.dart';
@@ -52,11 +55,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _updateProfile({String? name, String? photoUrl}) async {
+  Future<void> _updateProfile(
+      {String? name, String? photoUrl, bool manageLoading = true}) async {
     final user = _user;
     if (user == null) return;
 
-    setState(() => _isSaving = true);
+    if (manageLoading) setState(() => _isSaving = true);
     try {
       final newName = (name ?? _displayName).trim();
       final newPhoto = (photoUrl ?? _photoUrl).trim();
@@ -92,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(content: Text('Não foi possível atualizar o perfil.')),
       );
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (manageLoading && mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -121,6 +125,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _pickPhotoFromGallery() async {
+    final user = _user;
+    if (user == null) return;
+
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1200,
+      );
+
+      if (picked == null) return;
+
+      setState(() => _isSaving = true);
+
+      final file = File(picked.path);
+      final ref =
+          FirebaseStorage.instance.ref().child('users/${user.uid}/profile.jpg');
+
+      await ref.putFile(file);
+      final downloadUrl = await ref.getDownloadURL();
+
+      await _updateProfile(photoUrl: downloadUrl, manageLoading: false);
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao enviar foto: ${e.message}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível escolher a foto.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _showPhotoUrlDialog() async {
@@ -269,7 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 ProfilePic(
                   photoUrl: _photoUrl,
-                  onChangePhoto: _showPhotoUrlDialog,
+                  onChangePhoto: _pickPhotoFromGallery,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -291,8 +334,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   press: _showEditNameDialog,
                 ),
                 ProfileMenu(
-                  text: 'Adicionar/Alterar foto',
-                  iconData: Icons.photo_camera,
+                  text: 'Escolher foto da galeria',
+                  iconData: Icons.photo_library,
+                  press: _pickPhotoFromGallery,
+                ),
+                ProfileMenu(
+                  text: 'Inserir URL da foto',
+                  iconData: Icons.link,
                   press: _showPhotoUrlDialog,
                 ),
                 ProfileMenu(

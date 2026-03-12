@@ -48,11 +48,11 @@ class AchievementController {
         'id': 'screen_legend',
         'name': 'Lenda da Tela Grande',
         'description':
-            'Mil filmes assistidos! Você é uma enciclopédia viva do cinema.',
+            'Todos os filmes assistidos! Você é uma enciclopédia viva do cinema.',
         'iconUrl': 'assets/icons/achievements/star.png',
         'category': 'quantity',
         'ruleType': 'count',
-        'ruleValue': 1000,
+        'ruleValue': 563,
         'ruleCriteria': {'type': 'total_movies'},
       },
 

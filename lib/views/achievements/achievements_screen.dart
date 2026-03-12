@@ -112,9 +112,9 @@ class AchievementsScreenState extends State<AchievementsScreen>
     final bgColor = isUnlocked ? const Color(0xFFFFD700) : Colors.grey;
     final fallbackColor = isUnlocked ? const Color(0xFF0D1B2A) : Colors.white54;
 
-    Widget child;
+    Widget iconWidget;
     if (iconUrl.startsWith('assets/')) {
-      child = Image.asset(
+      iconWidget = Image.asset(
         iconUrl,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) =>
@@ -122,14 +122,42 @@ class AchievementsScreenState extends State<AchievementsScreen>
       );
     } else if (iconUrl.startsWith('http://') ||
         iconUrl.startsWith('https://')) {
-      child = Image.network(
+      iconWidget = Image.network(
         iconUrl,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) =>
             Icon(Icons.emoji_events, color: fallbackColor, size: 30),
       );
     } else {
-      child = Icon(Icons.emoji_events, color: fallbackColor, size: 30);
+      iconWidget = Icon(Icons.emoji_events, color: fallbackColor, size: 30);
+    }
+
+    if (!isUnlocked) {
+      iconWidget = ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+        ]),
+        child: iconWidget,
+      );
     }
 
     return Container(
@@ -138,8 +166,22 @@ class AchievementsScreenState extends State<AchievementsScreen>
       decoration: BoxDecoration(
         color: bgColor,
         shape: BoxShape.circle,
+        border: Border.all(
+          color: isUnlocked ? const Color(0xFFFFE082) : Colors.white24,
+          width: isUnlocked ? 2 : 1,
+        ),
+        boxShadow: isUnlocked
+            ? const [
+                BoxShadow(
+                  color: Color.fromARGB(120, 255, 215, 0),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                  offset: Offset(0, 2),
+                ),
+              ]
+            : const [],
       ),
-      child: ClipOval(child: child),
+      child: ClipOval(child: iconWidget),
     );
   }
 

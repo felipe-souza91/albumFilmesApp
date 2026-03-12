@@ -22,33 +22,47 @@ class AchievementUnlockedDialog extends StatelessWidget {
   Widget _buildIcon() {
     final iconUrl = achievement.iconUrl.trim();
 
+    Widget icon;
     if (iconUrl.startsWith('assets/')) {
-      return ClipOval(
-        child: Image.asset(
-          iconUrl,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events,
-              color: Color(0xFFFFD700), size: 48),
-        ),
+      icon = Image.asset(
+        iconUrl,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 48),
       );
+    } else if (iconUrl.startsWith('http://') ||
+        iconUrl.startsWith('https://')) {
+      icon = Image.network(
+        iconUrl,
+        width: 56,
+        height: 56,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 48),
+      );
+    } else {
+      icon = const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 48);
     }
 
-    if (iconUrl.startsWith('http://') || iconUrl.startsWith('https://')) {
-      return ClipOval(
-        child: Image.network(
-          iconUrl,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events,
-              color: Color(0xFFFFD700), size: 48),
-        ),
-      );
-    }
-
-    return const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 48);
+    return Container(
+      width: 62,
+      height: 62,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFFFE082), width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromARGB(120, 255, 215, 0),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipOval(child: icon),
+    );
   }
 
   @override
