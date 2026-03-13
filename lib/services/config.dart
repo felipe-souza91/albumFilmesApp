@@ -12,7 +12,7 @@ class Config {
           'eyJhdWQiOiJmNmI3NTBhZTU3ODExYjQ2ZWYwOTVhYWE5NjA5MmM1OSIsIm5iZiI6MTYyOTkzMTI3Ni4zMzQsInN1YiI6IjYxMjZjNzBjNWVkOTYyMDAyNjY5ZGVkYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ');
 
   static bool get adsEnabled =>
-      const bool.fromEnvironment('ADS_ENABLED', defaultValue: false);
+      const bool.fromEnvironment('ADS_ENABLED', defaultValue: true);
 
   static String get flavor =>
       const String.fromEnvironment('FLAVOR', defaultValue: 'prod');
