@@ -30,7 +30,10 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMovies();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMovies();
+    });
   }
 
   Future<void> _loadMovies() async {

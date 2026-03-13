@@ -41,7 +41,7 @@ void main() async {
     //print("Erro ao inicializar Firebase: $e");
   }
 
-  await _seedAchievementsIfAdmin();
+  //await _seedAchievementsIfAdmin();
   //await _initAds();
 
   runApp(
@@ -54,6 +54,7 @@ void main() async {
   );
 
   unawaited(_initAdsInBackground());
+  unawaited(_seedAchievementsIfAdmin());
 }
 
 Future<void> _initAdsInBackground() async {
