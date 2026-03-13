@@ -8,7 +8,7 @@ class AdsService {
   AdsService._();
   static final AdsService instance = AdsService._();
 
-  static const _kInterstitialPerDayCap = 3;
+  static const _kInterstitialPerDayCap = kDebugMode ? 999 : 100;
   static const _kPrefsDayKey = 'ads_day_key';
   static const _kPrefsCountKey = 'ads_day_count';
 
