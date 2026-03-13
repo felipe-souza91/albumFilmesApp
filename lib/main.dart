@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:album_filmes_app/providers/movie_provider.dart';
 import 'package:album_filmes_app/services/carrega_movies.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -50,16 +52,18 @@ void main() async {
       child: MyApp(),
     ),
   );
+
+  unawaited(_initAdsInBackground());
 }
 
-Future<void> _initAds() async {
+Future<void> _initAdsInBackground() async {
   try {
     if (!Config.adsEnabled) return;
+    if (Config.admobInterstitialUnitId.isEmpty) return;
+
     await AdsService.instance.init();
-    if (Config.admobInterstitialUnitId.isNotEmpty) {
-      await AdsService.instance
-          .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
-    }
+    await AdsService.instance
+        .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
   } catch (_) {
     // Não bloquear bootstrap por falha de ads
   }

@@ -150,8 +150,13 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       // 🎉 Pop-up de conquistas desbloqueadas agora
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
 
-      // 🚀 Exibir anúncio intersticial após marcar como assistido (se habilitado)
+      // anúncio padrão do fluxo de marcar assistido
       unawaited(_tryShowInterstitial());
+
+      // anúncio adicional quando há conquista desbloqueada
+      if (newlyUnlockedIds.isNotEmpty) {
+        unawaited(_tryShowInterstitial());
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
