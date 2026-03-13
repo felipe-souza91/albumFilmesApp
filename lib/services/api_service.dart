@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:hive/hive.dart';
+//import 'package:hive/hive.dart';
 import 'config.dart'; // <--- adiciona isso
 
 class ApiService {
   static const String baseUrl = 'https://api.themoviedb.org/3';
-  final Box _moviesCache = Hive.box('moviesCache');
+  //final Box _moviesCache = Hive.box('moviesCache');
 
   // Obtenha as chaves do Config
   String get _apiKey => Config.tmdbApiKey;

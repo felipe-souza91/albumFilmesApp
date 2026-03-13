@@ -4,7 +4,6 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 
-/// Serviço simples de anúncios com capping diário.
 class AdsService {
   AdsService._();
   static final AdsService instance = AdsService._();
@@ -13,16 +12,25 @@ class AdsService {
   static const _kPrefsDayKey = 'ads_day_key';
   static const _kPrefsCountKey = 'ads_day_count';
 
+  static const Duration _jsEngineCooldown = Duration(minutes: 30);
+
   bool _initialized = false;
+
   InterstitialAd? _interstitial;
   RewardedAd? _rewarded;
+
+  bool _isInterstitialLoading = false;
+  bool _isInterstitialShowing = false;
+
+  Timer? _interstitialRetryTimer;
   DateTime? _lastJsEngineFailureAt;
 
-  static const Duration _jsEngineCooldown = Duration(minutes: 30);
+  bool get hasInterstitialReady => _interstitial != null;
 
   Future<void> init() async {
     if (_initialized) return;
-    if (!Config.adsEnabled) return; // <- garante que não inicializa sem Ads
+    if (!Config.adsEnabled) return;
+
     await MobileAds.instance.initialize();
 
     if (Config.admobTestDeviceIds.isNotEmpty) {
@@ -36,15 +44,18 @@ class AdsService {
 
   Future<bool> canShowInterstitial() async {
     if (!Config.adsEnabled) return false;
+
     final now = DateTime.now();
     final day = '${now.year}-${now.month}-${now.day}';
     final prefs = await SharedPreferences.getInstance();
     final savedDay = prefs.getString(_kPrefsDayKey);
+
     if (savedDay != day) {
       await prefs.setString(_kPrefsDayKey, day);
       await prefs.setInt(_kPrefsCountKey, 0);
       return true;
     }
+
     final count = prefs.getInt(_kPrefsCountKey) ?? 0;
     return count < _kInterstitialPerDayCap;
   }
@@ -54,34 +65,98 @@ class AdsService {
     final day = '${now.year}-${now.month}-${now.day}';
     final prefs = await SharedPreferences.getInstance();
     final count = (prefs.getInt(_kPrefsCountKey) ?? 0) + 1;
+
     await prefs.setString(_kPrefsDayKey, day);
     await prefs.setInt(_kPrefsCountKey, count);
   }
 
-  Future<void> loadInterstitial({
+  bool _isInJsCooldown() {
+    final jsFailureAt = _lastJsEngineFailureAt;
+    if (jsFailureAt == null) return false;
+    return DateTime.now().difference(jsFailureAt) < _jsEngineCooldown;
+  }
+
+  void _scheduleInterstitialRetry({
+    required String adUnitId,
+    required int seconds,
+    required int nextAttempt,
+  }) {
+    _interstitialRetryTimer?.cancel();
+    _interstitialRetryTimer = Timer(Duration(seconds: seconds), () {
+      unawaited(preloadInterstitial(adUnitId: adUnitId, attempt: nextAttempt));
+    });
+  }
+
+  void _attachInterstitialCallbacks({
+    required InterstitialAd ad,
+    required String adUnitId,
+  }) {
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (ad) {
+        _isInterstitialShowing = true;
+        debugPrint('[Ads] Interstitial exibido.');
+        unawaited(_bumpInterstitialCount());
+      },
+      onAdDismissedFullScreenContent: (ad) {
+        debugPrint('[Ads] Interstitial fechado.');
+        _isInterstitialShowing = false;
+        ad.dispose();
+
+        if (identical(_interstitial, ad)) {
+          _interstitial = null;
+        }
+
+        unawaited(preloadInterstitial(adUnitId: adUnitId, force: true));
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        debugPrint('[Ads] Falha ao exibir interstitial: $error');
+        _isInterstitialShowing = false;
+        ad.dispose();
+
+        if (identical(_interstitial, ad)) {
+          _interstitial = null;
+        }
+
+        unawaited(preloadInterstitial(adUnitId: adUnitId, force: true));
+      },
+    );
+  }
+
+  Future<void> preloadInterstitial({
     required String adUnitId,
     int attempt = 1,
+    bool force = false,
   }) async {
     if (!Config.adsEnabled) return;
+    if (adUnitId.isEmpty) return;
+    if (_isInterstitialLoading) return;
+    if (_isInterstitialShowing) return;
+    if (_interstitial != null && !force) return;
 
-    final jsFailureAt = _lastJsEngineFailureAt;
-    if (jsFailureAt != null &&
-        DateTime.now().difference(jsFailureAt) < _jsEngineCooldown) {
-      debugPrint(
-          '[Ads] Pulando load interstitial durante cooldown de JS engine.');
+    if (_isInJsCooldown()) {
+      debugPrint('[Ads] Pulando preload durante cooldown de JS engine.');
       return;
     }
+
+    _isInterstitialLoading = true;
 
     await InterstitialAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
+          _interstitial?.dispose();
           _interstitial = ad;
+          _isInterstitialLoading = false;
+
+          _attachInterstitialCallbacks(ad: ad, adUnitId: adUnitId);
+
           debugPrint('[Ads] Interstitial carregado (attempt=$attempt).');
         },
         onAdFailedToLoad: (err) {
+          _isInterstitialLoading = false;
           _interstitial = null;
+
           final message = err.message.toLowerCase();
           final jsEngineFailure = message.contains('javascriptengine');
           final internalErrorCode = err.code == 0;
@@ -99,23 +174,22 @@ class AdsService {
             'noFill=$noFill).',
           );
 
-          if (shouldCooldown) {
-            return;
-          }
+          if (shouldCooldown) return;
 
           if (noFill && attempt < 4) {
-            final seconds = 15 * attempt;
-            Future<void>.delayed(
-              Duration(seconds: seconds),
-              () => loadInterstitial(adUnitId: adUnitId, attempt: attempt + 1),
+            _scheduleInterstitialRetry(
+              adUnitId: adUnitId,
+              seconds: 15 * attempt,
+              nextAttempt: attempt + 1,
             );
             return;
           }
 
           if (attempt < 2) {
-            Future<void>.delayed(
-              const Duration(seconds: 2),
-              () => loadInterstitial(adUnitId: adUnitId, attempt: attempt + 1),
+            _scheduleInterstitialRetry(
+              adUnitId: adUnitId,
+              seconds: 2,
+              nextAttempt: attempt + 1,
             );
           }
         },
@@ -123,16 +197,53 @@ class AdsService {
     );
   }
 
-  Future<void> showInterstitial() async {
-    if (_interstitial == null) return;
-    if (!await canShowInterstitial()) return;
-    await _interstitial!.show();
-    await _bumpInterstitialCount();
+  Future<bool> showInterstitialIfAvailable({
+    required String adUnitId,
+  }) async {
+    if (!Config.adsEnabled) return false;
+
+    if (!await canShowInterstitial()) {
+      debugPrint('[Ads] Interstitial bloqueado pelo cap diário.');
+      return false;
+    }
+
+    if (_isInterstitialShowing) {
+      debugPrint('[Ads] Já existe um interstitial sendo exibido.');
+      return false;
+    }
+
+    final ad = _interstitial;
+    if (ad == null) {
+      debugPrint('[Ads] Interstitial não estava pronto.');
+      unawaited(preloadInterstitial(adUnitId: adUnitId));
+      return false;
+    }
+
     _interstitial = null;
+
+    try {
+      await ad.show();
+      return true;
+    } catch (e) {
+      debugPrint('[Ads] Exceção ao chamar show(): $e');
+      _isInterstitialShowing = false;
+      ad.dispose();
+      unawaited(preloadInterstitial(adUnitId: adUnitId, force: true));
+      return false;
+    }
+  }
+
+  void disposeInterstitial() {
+    _interstitialRetryTimer?.cancel();
+    _interstitial?.dispose();
+    _interstitial = null;
+    _isInterstitialLoading = false;
+    _isInterstitialShowing = false;
   }
 
   Future<void> loadRewarded({required String adUnitId}) async {
     if (!Config.adsEnabled) return;
+
     await RewardedAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(),
@@ -143,17 +254,18 @@ class AdsService {
     );
   }
 
-  Future<void> showRewarded(
-      {required void Function(RewardItem) onReward}) async {
+  Future<void> showRewarded({
+    required void Function(RewardItem) onReward,
+  }) async {
     final ad = _rewarded;
     if (ad == null) return;
 
     await ad.show(
       onUserEarnedReward: (adWithoutView, reward) {
-        onReward(reward); // aqui você chama o callback que só recebe RewardItem
+        onReward(reward);
       },
     );
 
-    _rewarded = null; // opcional: descartar depois de usar
+    _rewarded = null;
   }
 }

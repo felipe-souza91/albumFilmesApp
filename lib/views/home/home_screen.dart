@@ -10,8 +10,8 @@ import '../achievements/achievements_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/user_preferences_service.dart';
 import '../../services/personalized_picker_service.dart';
-import '../../models/user_preferences.dart';
-import '../../services/personalized_picker_service.dart';
+//import '../../models/user_preferences.dart';
+//import '../../services/personalized_picker_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

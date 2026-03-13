@@ -50,10 +50,9 @@ class MovieProvider extends ChangeNotifier {
         );
       }).toList();
 
-      _applyFilters();
+      _applyFilters(notify: false);
     } catch (e, stackTrace) {
       _error = 'Error getting movies or user data: $e\n$stackTrace';
-      //print(_error);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -76,7 +75,7 @@ class MovieProvider extends ChangeNotifier {
   }
 
   // Aplicar filtros
-  void _applyFilters() {
+  void _applyFilters({bool notify = true}) {
     var result = [..._movies];
 
     if (_genreFilter != null && _genreFilter!.isNotEmpty) {
@@ -115,7 +114,10 @@ class MovieProvider extends ChangeNotifier {
     }
 
     _filteredMovies = result;
-    notifyListeners();
+
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   void setGenreFilterList(List<String>? genres) {

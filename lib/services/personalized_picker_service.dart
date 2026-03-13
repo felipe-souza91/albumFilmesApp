@@ -125,7 +125,7 @@ class PersonalizedPickerService {
     return movieKeys.intersection(favKeys).isNotEmpty;
   }
 
-  bool _hasDislikedGenreMatch<T>(
+  /*bool _hasDislikedGenreMatch<T>(
     MovieCandidate<T> c,
     UserPreferences prefs,
   ) {
@@ -137,7 +137,7 @@ class PersonalizedPickerService {
     if (movieKeys.isEmpty || dislikedKeys.isEmpty) return false;
 
     return movieKeys.intersection(dislikedKeys).isNotEmpty;
-  }
+  }*/
 
   Set<String> _normalizedGenreSetFromRaw(Iterable<String> labels) {
     return labels.map(_normalizeGenreLabel).whereType<String>().toSet();

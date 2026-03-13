@@ -46,19 +46,13 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
     super.initState();
     _isWatched = widget.movie.isWatched;
     _rating = widget.movie.rating;
-    unawaited(_preloadInterstitialIfNeeded());
-  }
 
-  Future<void> _preloadInterstitialIfNeeded() async {
-    try {
-      if (!Config.adsEnabled) return;
-      if (Config.admobInterstitialUnitId.isEmpty) return;
-
-      await AdsService.instance.init();
-      await AdsService.instance
-          .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
-    } catch (_) {
-      // Não bloquear abertura da tela por falha de ads
+    if (Config.adsEnabled && Config.admobInterstitialUnitId.isNotEmpty) {
+      unawaited(
+        AdsService.instance.preloadInterstitial(
+          adUnitId: Config.admobInterstitialUnitId,
+        ),
+      );
     }
   }
 
@@ -119,11 +113,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
       if (!mounted) return;
 
-      // Atualizar o provider
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), true);
 
-      // ✅ Checar conquistas e capturar as recém-desbloqueadas
       final watchedMovies =
           movieProvider.movies.where((m) => m.isWatched).toList();
       final watchedIds = watchedMovies.map((m) => m.id.toString()).toList();
@@ -138,25 +130,18 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
           watchedIds,
           watchedMovies,
         );
-      } catch (_) {
-        // Não bloquear o fluxo principal de marcar assistido por falha em conquistas
-      }
+      } catch (_) {}
 
-      // Feedback padrão
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Filme marcado como assistido!')),
       );
 
-      // 🎉 Pop-up de conquistas desbloqueadas agora
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
 
-      // anúncio padrão do fluxo de marcar assistido
+      // Só uma tentativa por ação do usuário.
       unawaited(_tryShowInterstitial());
-
-      // anúncio adicional quando há conquista desbloqueada
-      if (newlyUnlockedIds.isNotEmpty) {
-        unawaited(_tryShowInterstitial());
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -178,9 +163,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       if (Config.admobInterstitialUnitId.isEmpty) return;
 
       await AdsService.instance.init();
-      await AdsService.instance.showInterstitial();
-      await AdsService.instance
-          .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
+      await AdsService.instance.showInterstitialIfAvailable(
+        adUnitId: Config.admobInterstitialUnitId,
+      );
     } catch (_) {
       // Não bloquear UX por falha de ads
     }
@@ -290,8 +275,6 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
   }
 
   void _showScratchDialog() {
-    setState(() {});
-
     showDialog(
       context: context,
       barrierDismissible: false,

@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:firebase_auth/firebase_auth.dart';
+//import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/user_preferences.dart';
@@ -165,7 +165,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   UserPreferences _buildUserPreferencesFromAnswers() {
     // defaults de segurança
     int colorMain = _colorMain ?? 1;
-    int colorLeast = _colorLeast ?? 0;
+    //int colorLeast = _colorLeast ?? 0;
     int musicStyle = _musicStyle ?? 0;
     int musicPurpose = _musicPurpose ?? 0;
     int whenTired = _whenTired ?? 0;

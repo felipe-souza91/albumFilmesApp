@@ -63,7 +63,7 @@ Future<void> _initAdsInBackground() async {
 
     await AdsService.instance.init();
     await AdsService.instance
-        .loadInterstitial(adUnitId: Config.admobInterstitialUnitId);
+        .preloadInterstitial(adUnitId: Config.admobInterstitialUnitId);
   } catch (_) {
     // Não bloquear bootstrap por falha de ads
   }
