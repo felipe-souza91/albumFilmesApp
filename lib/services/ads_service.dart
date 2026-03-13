@@ -16,6 +16,9 @@ class AdsService {
   bool _initialized = false;
   InterstitialAd? _interstitial;
   RewardedAd? _rewarded;
+  DateTime? _lastJsEngineFailureAt;
+
+  static const Duration _jsEngineCooldown = Duration(minutes: 30);
 
   Future<void> init() async {
     if (_initialized) return;
@@ -61,6 +64,14 @@ class AdsService {
   }) async {
     if (!Config.adsEnabled) return;
 
+    final jsFailureAt = _lastJsEngineFailureAt;
+    if (jsFailureAt != null &&
+        DateTime.now().difference(jsFailureAt) < _jsEngineCooldown) {
+      debugPrint(
+          '[Ads] Pulando load interstitial durante cooldown de JS engine.');
+      return;
+    }
+
     await InterstitialAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(),
@@ -71,10 +82,35 @@ class AdsService {
         },
         onAdFailedToLoad: (err) {
           _interstitial = null;
+          final message = err.message.toLowerCase();
+          final jsEngineFailure = message.contains('javascriptengine');
+          final internalErrorCode = err.code == 0;
+          final noFill = err.code == 3;
+          final shouldCooldown = jsEngineFailure || internalErrorCode;
+
+          if (shouldCooldown) {
+            _lastJsEngineFailureAt = DateTime.now();
+          }
+
           debugPrint(
             '[Ads] Falha ao carregar interstitial '
-            '(code=${err.code}, message=${err.message}, attempt=$attempt).',
+            '(code=${err.code}, message=${err.message}, attempt=$attempt, '
+            'jsEngineFailure=$jsEngineFailure, internalErrorCode=$internalErrorCode, '
+            'noFill=$noFill).',
           );
+
+          if (shouldCooldown) {
+            return;
+          }
+
+          if (noFill && attempt < 4) {
+            final seconds = 15 * attempt;
+            Future<void>.delayed(
+              Duration(seconds: seconds),
+              () => loadInterstitial(adUnitId: adUnitId, attempt: attempt + 1),
+            );
+            return;
+          }
 
           if (attempt < 2) {
             Future<void>.delayed(
