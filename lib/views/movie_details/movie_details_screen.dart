@@ -107,15 +107,42 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         rating: _rating,
       );
 
-      setState(() {
-        _isWatched = true;
-      });
-
       if (!mounted) return;
 
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), true);
 
+      // Libera a UI imediatamente
+      setState(() {
+        _isWatched = true;
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Filme marcado como assistido!')),
+      );
+
+      // Daqui para baixo, tudo oportunístico / em background
+      unawaited(_processAfterWatched(userId, movieProvider));
+      unawaited(_tryShowInterstitial());
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _processAfterWatched(
+    String userId,
+    MovieProvider movieProvider,
+  ) async {
+    try {
       final watchedMovies =
           movieProvider.movies.where((m) => m.isWatched).toList();
       final watchedIds = watchedMovies.map((m) => m.id.toString()).toList();
@@ -123,37 +150,17 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       final achievementController =
           AchievementController(firestoreService: _firestoreService);
 
-      List<String> newlyUnlockedIds = const [];
-      try {
-        newlyUnlockedIds = await achievementController.checkAchievements(
-          userId,
-          watchedIds,
-          watchedMovies,
-        );
-      } catch (_) {}
+      final newlyUnlockedIds = await achievementController.checkAchievements(
+        userId,
+        watchedIds,
+        watchedMovies,
+      );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Filme marcado como assistido!')),
-      );
-
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
-
-      // Só uma tentativa por ação do usuário.
-      unawaited(_tryShowInterstitial());
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    } catch (_) {
+      // não quebra a UX principal
     }
   }
 
