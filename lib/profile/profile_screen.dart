@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as p;
 
 import '../views/auth/login_screen.dart';
 import 'preferences_screen.dart';
@@ -105,22 +106,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Editar nome'),
+        backgroundColor: const Color(0xFF0D1B2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Editar nome',
+            style: TextStyle(color: Color(0xFFFFD700))),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: 'Seu nome'),
+          decoration: const InputDecoration(
+              hintText: 'Seu nome',
+              hintStyle: TextStyle(color: Colors.white54)),
+          style: const TextStyle(color: Colors.white),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child:
+                const Text('Cancelar', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD700),
+              foregroundColor: const Color(0xFF0D1B2A),
+            ),
             onPressed: () async {
               Navigator.pop(context);
               await _updateProfile(name: controller.text);
             },
-            child: const Text('Salvar'),
+            child: const Text('Salvar',
+                style: TextStyle(color: Color(0xFF0D1B2A))),
           ),
         ],
       ),
@@ -144,11 +157,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isSaving = true);
 
       final file = File(picked.path);
-      final ref =
-          FirebaseStorage.instance.ref().child('users/${user.uid}/profile.jpg');
+      final ext = p.extension(file.path).replaceFirst('.', '').toLowerCase();
+      final fileExt = ext.isEmpty ? 'jpg' : ext;
+      final ref = FirebaseStorage.instance.ref().child(
+          'users/${user.uid}/profile_${DateTime.now().millisecondsSinceEpoch}.$fileExt');
 
-      await ref.putFile(file);
-      final downloadUrl = await ref.getDownloadURL();
+      final snapshot = await ref.putFile(file);
+      final downloadUrl = await snapshot.ref.getDownloadURL();
 
       await _updateProfile(photoUrl: downloadUrl, manageLoading: false);
     } on FirebaseException catch (e) {
@@ -171,22 +186,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Adicionar/alterar foto (URL)'),
+        backgroundColor: const Color(0xFF0D1B2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Adicionar/alterar foto (URL)',
+            style: TextStyle(color: Color(0xFFFFD700))),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: 'https://...'),
+          decoration: const InputDecoration(
+              hintText: 'https://...',
+              hintStyle: TextStyle(color: Colors.white54)),
+          style: const TextStyle(color: Colors.white),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child:
+                const Text('Cancelar', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD700),
+              foregroundColor: const Color(0xFF0D1B2A),
+            ),
             onPressed: () async {
               Navigator.pop(context);
               await _updateProfile(photoUrl: controller.text);
             },
-            child: const Text('Salvar'),
+            child: const Text('Salvar',
+                style: TextStyle(color: Color(0xFF0D1B2A))),
           ),
         ],
       ),
@@ -205,34 +232,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Alterar senha'),
+        backgroundColor: const Color(0xFF0D1B2A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Alterar senha',
+            style: TextStyle(color: Color(0xFFFFD700))),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: currentController,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Senha atual'),
+              decoration: const InputDecoration(
+                  labelText: 'Senha atual',
+                  labelStyle: TextStyle(color: Colors.white70)),
+              style: const TextStyle(color: Colors.white),
             ),
             TextField(
               controller: newController,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Nova senha'),
+              decoration: const InputDecoration(
+                  labelText: 'Nova senha',
+                  labelStyle: TextStyle(color: Colors.white70)),
+              style: const TextStyle(color: Colors.white),
             ),
             TextField(
               controller: confirmController,
               obscureText: true,
-              decoration:
-                  const InputDecoration(labelText: 'Confirmar nova senha'),
+              decoration: const InputDecoration(
+                  labelText: 'Confirmar nova senha',
+                  labelStyle: TextStyle(color: Colors.white70)),
+              style: const TextStyle(color: Colors.white),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child:
+                const Text('Cancelar', style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD700),
+              foregroundColor: const Color(0xFF0D1B2A),
+            ),
             onPressed: () async {
               final current = currentController.text.trim();
               final next = newController.text.trim();
@@ -279,7 +322,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }
             },
-            child: const Text('Alterar'),
+            child: const Text('Alterar',
+                style: TextStyle(color: Color(0xFF0D1B2A))),
           ),
         ],
       ),

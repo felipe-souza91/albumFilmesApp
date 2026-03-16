@@ -66,7 +66,11 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
           .collection(_firestoreService.achievementsCollection)
           .get();
 
-      final all = snap.docs.map((d) => Achievement.fromJson(d.data())).toList();
+      final all = snap.docs.map((d) {
+        final data = d.data();
+        data['id'] ??= d.id;
+        return Achievement.fromJson(data);
+      }).toList();
 
       // Mostra um dialog por conquista desbloqueada agora
       for (final id in unlockedIds) {
@@ -118,9 +122,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Filme marcado como assistido!')),
-      );
+      );*/
 
       // Daqui para baixo, tudo oportunístico / em background
       unawaited(_processAfterWatched(userId, movieProvider));
@@ -159,6 +163,10 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       if (!mounted) return;
 
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
+
+      if (newlyUnlockedIds.isNotEmpty) {
+        unawaited(_tryShowInterstitial());
+      }
     } catch (_) {
       // não quebra a UX principal
     }
@@ -203,9 +211,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Filme marcado como não assistido!')),
-      );
+      );*/
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -244,9 +252,9 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieRating(widget.movie.id.toString(), rating);
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      /* ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Avaliação atualizada!')),
-      );
+      );*/
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
