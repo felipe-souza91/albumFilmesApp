@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
 late AnimationController _controller;
@@ -28,7 +29,11 @@ class _SplashScreenState extends State<SplashScreen>
     // Redireciona após 5 segundos
     Timer(const Duration(seconds: 5), () {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
+        final hasActiveSession = FirebaseAuth.instance.currentUser != null;
+        Navigator.pushReplacementNamed(
+          context,
+          hasActiveSession ? '/home' : '/login',
+        );
       }
     });
   }

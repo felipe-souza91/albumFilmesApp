@@ -157,19 +157,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isSaving = true);
 
       final file = File(picked.path);
+      final bytes = await file.readAsBytes();
       final ext = p.extension(file.path).replaceFirst('.', '').toLowerCase();
       final fileExt = ext.isEmpty ? 'jpg' : ext;
+      final contentType = (fileExt == 'png')
+          ? 'image/png'
+          : (fileExt == 'webp')
+              ? 'image/webp'
+              : 'image/jpeg';
+
       final ref = FirebaseStorage.instance.ref().child(
           'users/${user.uid}/profile_${DateTime.now().millisecondsSinceEpoch}.$fileExt');
 
-      final snapshot = await ref.putFile(file);
+      UploadTask startUpload() => ref.putData(
+            bytes,
+            SettableMetadata(contentType: contentType),
+          );
+
+      TaskSnapshot snapshot;
+      try {
+        snapshot = await startUpload();
+      } on FirebaseException catch (e) {
+        if (e.code == 'canceled') {
+          snapshot = await startUpload();
+        } else {
+          rethrow;
+        }
+      }
+
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
       await _updateProfile(photoUrl: downloadUrl, manageLoading: false);
     } on FirebaseException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao enviar foto: ${e.message}')),
+        SnackBar(content: Text('Erro ao enviar foto: ${e.message ?? e.code}')),
       );
     } catch (_) {
       if (!mounted) return;
