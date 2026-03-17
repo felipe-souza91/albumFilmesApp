@@ -1,9 +1,7 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'config.dart';
 
 class AdsService {
@@ -33,7 +31,6 @@ class AdsService {
     if (_initialized) return;
     if (!Config.adsEnabled) return;
 
-    debugPrint('[Ads] inicializando Mobile Ads.');
     await MobileAds.instance.initialize();
 
     if (Config.admobTestDeviceIds.isNotEmpty) {
@@ -43,7 +40,6 @@ class AdsService {
     }
 
     _initialized = true;
-    debugPrint('[Ads] Mobile Ads inicializado.');
   }
 
   Future<bool> canShowInterstitial() async {
@@ -97,8 +93,8 @@ class AdsService {
   }) {
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (ad) {
-        debugPrint('[Ads] Interstitial exibido.');
         _isInterstitialShowing = true;
+        debugPrint('[Ads] Interstitial exibido.');
         unawaited(_bumpInterstitialCount());
       },
       onAdDismissedFullScreenContent: (ad) {
@@ -133,34 +129,16 @@ class AdsService {
   }) async {
     if (!Config.adsEnabled) return;
     if (adUnitId.isEmpty) return;
-
-    if (!_initialized) {
-      await init();
-      if (!_initialized) return;
-    }
-
-    if (_isInterstitialLoading) {
-      debugPrint(
-          '[Ads] preload ignorado: já existe carregamento em andamento.');
-      return;
-    }
-    if (_isInterstitialShowing) {
-      debugPrint('[Ads] preload ignorado: interstitial já está em exibição.');
-      return;
-    }
-    if (_interstitial != null && !force) {
-      debugPrint('[Ads] preload ignorado: interstitial já está pronto.');
-      return;
-    }
+    if (_isInterstitialLoading) return;
+    if (_isInterstitialShowing) return;
+    if (_interstitial != null && !force) return;
 
     if (_isInJsCooldown()) {
-      debugPrint('[Ads] preload ignorado: cooldown de JS engine ativo.');
+      debugPrint('[Ads] Pulando preload durante cooldown de JS engine.');
       return;
     }
 
     _isInterstitialLoading = true;
-    debugPrint(
-        '[Ads] iniciando preload do interstitial (attempt=$attempt, force=$force).');
 
     await InterstitialAd.load(
       adUnitId: adUnitId,
@@ -222,18 +200,7 @@ class AdsService {
   Future<bool> showInterstitialIfAvailable({
     required String adUnitId,
   }) async {
-    debugPrint(
-      '[Ads] showInterstitialIfAvailable chamado '
-      '(initialized=$_initialized, ready=${_interstitial != null}, '
-      'loading=$_isInterstitialLoading, showing=$_isInterstitialShowing).',
-    );
-
     if (!Config.adsEnabled) return false;
-
-    if (!_initialized) {
-      await init();
-      if (!_initialized) return false;
-    }
 
     if (!await canShowInterstitial()) {
       debugPrint('[Ads] Interstitial bloqueado pelo cap diário.');
@@ -253,7 +220,6 @@ class AdsService {
     }
 
     _interstitial = null;
-    _isInterstitialShowing = true;
 
     try {
       await ad.show();

@@ -35,6 +35,18 @@ class Achievement {
     );
   }
 
+  // Mantidos para compatibilidade com telas que já usam essas propriedades.
+  String get title => name;
+
+  int get targetValue {
+    final value = ruleValue;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

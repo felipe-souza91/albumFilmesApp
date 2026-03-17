@@ -254,17 +254,6 @@ class AchievementController {
     await firestoreService.setupAchievements(achievements);
   }
 
-  /// Ponto de entrada canônico para reavaliar conquistas do usuário.
-  ///
-  /// Esta versão busca os filmes assistidos diretamente no Firestore para evitar
-  /// inconsistências entre cache local/provider e o estado persistido.
-  Future<List<String>> checkAchievementsForUser(String userId) async {
-    final watchedMovies = await firestoreService.getWatchedMovies(userId);
-    final watchedMovieIds = watchedMovies.map((movie) => movie.id.toString()).toList();
-
-    return checkAchievements(userId, watchedMovieIds, watchedMovies);
-  }
-
   /// Verificar conquistas para um usuário.
   /// Retorna uma lista de IDs que foram desbloqueadas AGORA (para mostrar popup).
   Future<List<String>> checkAchievements(
@@ -292,8 +281,7 @@ class AchievementController {
     await unlockIf(totalWatched >= 100, 'enthusiast');
     await unlockIf(totalWatched >= 300, 'leonidas');
     await unlockIf(totalWatched >= 500, 'marathon_master');
-    // Corrige inconsistência: o cadastro da conquista usa 563 como meta.
-    await unlockIf(totalWatched >= 563, 'screen_legend');
+    await unlockIf(totalWatched >= 1000, 'screen_legend');
 
     await firestoreService.updateAchievementProgress(
         userId, 'enthusiast', totalWatched);

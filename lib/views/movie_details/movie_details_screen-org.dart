@@ -1,7 +1,5 @@
 // lib/views/movie_details/movie_details_screen.dart
 import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -42,7 +40,6 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
   bool _isWatched = false;
   double _rating = 0.0;
   bool _isLoading = false;
-  bool _isRatingSaving = false;
 
   @override
   void initState() {
@@ -50,30 +47,21 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
     _isWatched = widget.movie.isWatched;
     _rating = widget.movie.rating;
 
-    // Preload oportunístico: aumenta a chance de o anúncio já estar pronto
-    // quando o usuário concluir a ação principal desta tela.
-    unawaited(_prepareInterstitial());
-  }
-
-  Future<void> _prepareInterstitial() async {
-    try {
-      if (!Config.adsEnabled) return;
-      if (Config.admobInterstitialUnitId.isEmpty) return;
-
-      debugPrint('[Ads][details] preparando interstitial.');
-      await AdsService.instance.init();
-      await AdsService.instance.preloadInterstitial(
-        adUnitId: Config.admobInterstitialUnitId,
+    if (Config.adsEnabled && Config.admobInterstitialUnitId.isNotEmpty) {
+      unawaited(
+        AdsService.instance.preloadInterstitial(
+          adUnitId: Config.admobInterstitialUnitId,
+        ),
       );
-    } catch (e) {
-      debugPrint('[Ads][details] falha ao preparar interstitial: $e');
     }
   }
 
   Future<void> _showUnlockedAchievementsPopup(List<String> unlockedIds) async {
-    if (unlockedIds.isEmpty || !mounted) return;
+    if (unlockedIds.isEmpty) return;
+    if (!mounted) return;
 
     try {
+      // Carrega todas as conquistas para mapear id -> Achievement
       final snap = await _firestoreService.firestore
           .collection(_firestoreService.achievementsCollection)
           .get();
@@ -84,25 +72,27 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         return Achievement.fromJson(data);
       }).toList();
 
+      // Mostra um dialog por conquista desbloqueada agora
       for (final id in unlockedIds) {
-        Achievement? achievement;
+        Achievement? ach;
         try {
-          achievement = all.firstWhere((a) => a.id == id);
+          ach = all.firstWhere((a) => a.id == id);
         } catch (_) {
-          achievement = null;
+          ach = null;
         }
 
         if (!mounted) return;
-        if (achievement == null) continue;
 
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => AchievementUnlockedDialog(achievement: achievement!),
-        );
+        if (ach != null) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AchievementUnlockedDialog(achievement: ach!),
+          );
+        }
       }
-    } catch (e) {
-      debugPrint('[Achievement] erro ao mostrar popup de conquista: $e');
+    } catch (_) {
+      // se falhar carregar conquistas, não quebra a experiência do usuário
     }
   }
 
@@ -125,126 +115,74 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), true);
-      movieProvider.updateMovieRating(widget.movie.id.toString(), _rating);
 
+      // Libera a UI imediatamente
       setState(() {
         _isWatched = true;
         _isLoading = false;
       });
 
-      // Correção importante:
-      // o anúncio de "assistido" não pode mais depender do fluxo de
-      // conquistas terminar. Primeiro tentamos o anúncio do evento principal;
-      // depois processamos conquistas.
-      unawaited(_handlePostWatchedFlow(userId));
+      /*ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Filme marcado como assistido!')),
+      );*/
+
+      // Daqui para baixo, tudo oportunístico / em background
+      unawaited(_processAfterWatched(userId, movieProvider));
+      unawaited(_tryShowInterstitial());
     } catch (e) {
-      if (!mounted) return;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
 
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao marcar filme como assistido: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _handlePostWatchedFlow(String userId) async {
-    // Pequena folga para o Flutter concluir a pintura do novo estado da tela.
-    await Future<void>.delayed(const Duration(milliseconds: 150));
-
-    final watchedAdShown = await _tryShowInterstitial(
-      reason: 'watched',
-      waitForReady: const Duration(milliseconds: 1200),
-    );
-
-    final newlyUnlockedIds = await _handleAchievementUnlockFlow(userId);
-
-    // Se o anúncio do evento "assistido" já apareceu, não tentamos um segundo
-    // anúncio aqui para evitar duplicidade no mesmo fluxo.
-    if (!mounted || newlyUnlockedIds.isEmpty || watchedAdShown) return;
-
-    await Future<void>.delayed(const Duration(milliseconds: 150));
-    await _tryShowInterstitial(
-      reason: 'achievement_after_watched',
-      waitForReady: const Duration(milliseconds: 1200),
-    );
-  }
-
-  Future<List<String>> _handleAchievementUnlockFlow(String userId) async {
+  Future<void> _processAfterWatched(
+    String userId,
+    MovieProvider movieProvider,
+  ) async {
     try {
+      final watchedMovies =
+          movieProvider.movies.where((m) => m.isWatched).toList();
+      final watchedIds = watchedMovies.map((m) => m.id.toString()).toList();
+
       final achievementController =
           AchievementController(firestoreService: _firestoreService);
 
-      final newlyUnlockedIds =
-          await achievementController.checkAchievementsForUser(userId);
-
-      debugPrint(
-        '[Achievement] conquistas desbloqueadas agora: ${newlyUnlockedIds.join(', ')}',
+      final newlyUnlockedIds = await achievementController.checkAchievements(
+        userId,
+        watchedIds,
+        watchedMovies,
       );
 
-      if (!mounted || newlyUnlockedIds.isEmpty) {
-        return newlyUnlockedIds;
-      }
+      if (!mounted) return;
 
       await _showUnlockedAchievementsPopup(newlyUnlockedIds);
-      return newlyUnlockedIds;
-    } catch (e) {
-      debugPrint('[Achievement] falha ao reavaliar conquistas: $e');
-      return const <String>[];
+
+      if (newlyUnlockedIds.isNotEmpty) {
+        unawaited(_tryShowInterstitial());
+      }
+    } catch (_) {
+      // não quebra a UX principal
     }
   }
 
-  Future<bool> _tryShowInterstitial({
-    required String reason,
-    Duration waitForReady = Duration.zero,
-  }) async {
+  Future<void> _tryShowInterstitial() async {
     try {
-      if (!Config.adsEnabled) {
-        debugPrint('[Ads][$reason] ads desabilitados.');
-        return false;
-      }
-      if (Config.admobInterstitialUnitId.isEmpty) {
-        debugPrint('[Ads][$reason] adUnitId vazio.');
-        return false;
-      }
-
-      debugPrint(
-        '[Ads][$reason] tentativa iniciada '
-        '(ready=${AdsService.instance.hasInterstitialReady}).',
-      );
+      if (!Config.adsEnabled) return;
+      if (Config.admobInterstitialUnitId.isEmpty) return;
 
       await AdsService.instance.init();
-
-      if (!AdsService.instance.hasInterstitialReady) {
-        await AdsService.instance.preloadInterstitial(
-          adUnitId: Config.admobInterstitialUnitId,
-        );
-      }
-
-      if (waitForReady > Duration.zero &&
-          !AdsService.instance.hasInterstitialReady) {
-        final deadline = DateTime.now().add(waitForReady);
-
-        while (!AdsService.instance.hasInterstitialReady &&
-            DateTime.now().isBefore(deadline)) {
-          await Future<void>.delayed(const Duration(milliseconds: 100));
-        }
-      }
-
-      final shown = await AdsService.instance.showInterstitialIfAvailable(
+      await AdsService.instance.showInterstitialIfAvailable(
         adUnitId: Config.admobInterstitialUnitId,
       );
-
-      debugPrint('[Ads][$reason] resultado da tentativa: shown=$shown.');
-      return shown;
-    } catch (e, stackTrace) {
-      debugPrint('[Ads][$reason] excecao ao tentar exibir interstitial: $e');
-      if (kDebugMode) {
-        debugPrint(stackTrace.toString());
-      }
-      return false;
+    } catch (_) {
+      // Não bloquear UX por falha de ads
     }
   }
 
@@ -263,20 +201,24 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         rating: _rating,
       );
 
-      if (!mounted) return;
-
       setState(() {
         _isWatched = false;
       });
 
+      if (!mounted) return;
+
+      // Atualizar o provider
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieWatchedStatus(widget.movie.id.toString(), false);
+
+      /*ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Filme marcado como não assistido!')),
+      );*/
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao marcar filme como não assistido: $e'),
-          ),
+              content: Text('Erro ao marcar filme como não assistido: $e')),
         );
       }
     } finally {
@@ -290,12 +232,10 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
   Future<void> _rateMovie(double rating) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null || _isRatingSaving) return;
-
-    final previousRating = _rating;
+    if (userId == null) return;
 
     setState(() {
-      _isRatingSaving = true;
+      _isLoading = true;
       _rating = rating;
     });
 
@@ -308,42 +248,29 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
       if (!mounted) return;
 
+      // Atualizar o provider
       final movieProvider = Provider.of<MovieProvider>(context, listen: false);
       movieProvider.updateMovieRating(widget.movie.id.toString(), rating);
 
-      setState(() {
-        _isRatingSaving = false;
-      });
-
-      // A nota aparece imediatamente; conquista/anúncio rodam depois.
-      unawaited(_handlePostRatingFlow(userId));
+      /* ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Avaliação atualizada!')),
+      );*/
     } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _isRatingSaving = false;
-        _rating = previousRating;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao salvar avaliação: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar avaliação: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _handlePostRatingFlow(String userId) async {
-    final newlyUnlockedIds = await _handleAchievementUnlockFlow(userId);
-
-    if (!mounted || newlyUnlockedIds.isEmpty) return;
-
-    await Future<void>.delayed(const Duration(milliseconds: 150));
-    await _tryShowInterstitial(
-      reason: 'rating_achievement',
-      waitForReady: const Duration(milliseconds: 1200),
-    );
-  }
-
-  Future<void> _shareViaWhatsApp() async {
+  void _shareViaWhatsApp() async {
     final text =
         'Acabei de assistir ${widget.movie.title} e dei ${_rating.toString()} estrelas! #MovieAlbum';
     final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -352,7 +279,6 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
       await Share.share(text, subject: 'Compartilhar via WhatsApp');
       if (userId != null) {
         await _firestoreService.incrementUserMetric(userId, 'shares');
-        unawaited(_handlePostShareFlow(userId));
       }
     } catch (e) {
       if (mounted) {
@@ -361,18 +287,6 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
         );
       }
     }
-  }
-
-  Future<void> _handlePostShareFlow(String userId) async {
-    final newlyUnlockedIds = await _handleAchievementUnlockFlow(userId);
-
-    if (!mounted || newlyUnlockedIds.isEmpty) return;
-
-    await Future<void>.delayed(const Duration(milliseconds: 150));
-    await _tryShowInterstitial(
-      reason: 'share_achievement',
-      waitForReady: const Duration(milliseconds: 1200),
-    );
   }
 
   void _showScratchDialog() {
@@ -544,8 +458,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                                   RatingStars(
                                     rating: _rating,
                                     size: 30,
-                                    onRatingChanged:
-                                        _isRatingSaving ? null : _rateMovie,
+                                    onRatingChanged: _rateMovie,
                                   ),
                                 ],
                               ),

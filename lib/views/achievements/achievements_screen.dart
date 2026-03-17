@@ -1,9 +1,17 @@
 // lib/views/achievements/achievements_screen.dart
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../controllers/achievement_controller.dart';
 import '../../models/achievement.dart';
 import '../../services/achievement_share_service.dart';
+import '../../services/ads_service.dart';
+import '../../services/config.dart';
 import '../../services/firestore_service.dart';
+import 'achievement_unlocked_dialog.dart';
 
 class AchievementsScreen extends StatefulWidget {
   const AchievementsScreen({super.key});
@@ -25,6 +33,7 @@ class AchievementsScreenState extends State<AchievementsScreen>
     super.initState();
     _tabController = TabController(length: 7, vsync: this);
     _loadAchievements();
+    unawaited(_prepareInterstitial());
   }
 
   @override
@@ -33,10 +42,27 @@ class AchievementsScreenState extends State<AchievementsScreen>
     super.dispose();
   }
 
+  Future<void> _prepareInterstitial() async {
+    try {
+      if (!Config.adsEnabled) return;
+      if (Config.admobInterstitialUnitId.isEmpty) return;
+
+      debugPrint('[Ads][achievements] preparando interstitial.');
+      await AdsService.instance.init();
+      await AdsService.instance.preloadInterstitial(
+        adUnitId: Config.admobInterstitialUnitId,
+      );
+    } catch (e) {
+      debugPrint('[Ads][achievements] falha ao preparar interstitial: $e');
+    }
+  }
+
   Future<void> _loadAchievements() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -44,16 +70,16 @@ class AchievementsScreenState extends State<AchievementsScreen>
         throw Exception('Usuário não autenticado');
       }
 
-      // Carregar todas as conquistas
       final achievementsSnapshot = await _firestoreService.firestore
           .collection(_firestoreService.achievementsCollection)
           .get();
 
-      _achievements = achievementsSnapshot.docs
-          .map((doc) => Achievement.fromJson(doc.data()))
-          .toList();
+      _achievements = achievementsSnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] ??= doc.id;
+        return Achievement.fromJson(data);
+      }).toList();
 
-      // Carregar conquistas do usuário
       final userAchievementsSnapshot = await _firestoreService.firestore
           .collection(_firestoreService.userAchievementsCollection)
           .where('userId', isEqualTo: userId)
@@ -69,9 +95,11 @@ class AchievementsScreenState extends State<AchievementsScreen>
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -91,12 +119,107 @@ class AchievementsScreenState extends State<AchievementsScreen>
     }
   }
 
+  Future<void> _showUnlockedAchievementsPopup(List<String> unlockedIds) async {
+    if (unlockedIds.isEmpty || !mounted) return;
+
+    for (final id in unlockedIds) {
+      Achievement? achievement;
+      try {
+        achievement = _achievements.firstWhere((a) => a.id == id);
+      } catch (_) {
+        achievement = null;
+      }
+
+      if (!mounted) return;
+      if (achievement == null) continue;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AchievementUnlockedDialog(achievement: achievement!),
+      );
+    }
+  }
+
+  Future<bool> _tryShowInterstitial({
+    required String reason,
+    Duration waitForReady = Duration.zero,
+  }) async {
+    try {
+      if (!Config.adsEnabled) {
+        debugPrint('[Ads][$reason] ads desabilitados.');
+        return false;
+      }
+      if (Config.admobInterstitialUnitId.isEmpty) {
+        debugPrint('[Ads][$reason] adUnitId vazio.');
+        return false;
+      }
+
+      debugPrint(
+        '[Ads][$reason] tentativa iniciada '
+        '(ready=${AdsService.instance.hasInterstitialReady}).',
+      );
+
+      await AdsService.instance.init();
+
+      if (!AdsService.instance.hasInterstitialReady) {
+        await AdsService.instance.preloadInterstitial(
+          adUnitId: Config.admobInterstitialUnitId,
+        );
+      }
+
+      if (waitForReady > Duration.zero &&
+          !AdsService.instance.hasInterstitialReady) {
+        final deadline = DateTime.now().add(waitForReady);
+
+        while (!AdsService.instance.hasInterstitialReady &&
+            DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+      }
+
+      final shown = await AdsService.instance.showInterstitialIfAvailable(
+        adUnitId: Config.admobInterstitialUnitId,
+      );
+
+      debugPrint('[Ads][$reason] resultado da tentativa: shown=$shown.');
+      return shown;
+    } catch (e, stackTrace) {
+      debugPrint('[Ads][$reason] excecao ao tentar exibir interstitial: $e');
+      if (kDebugMode) {
+        debugPrint(stackTrace.toString());
+      }
+      return false;
+    }
+  }
+
+  Future<List<String>> _handleAchievementUnlockFlow(String userId) async {
+    try {
+      final controller = AchievementController(
+        firestoreService: _firestoreService,
+      );
+
+      final newlyUnlockedIds =
+          await controller.checkAchievementsForUser(userId);
+
+      if (newlyUnlockedIds.isEmpty || !mounted) return newlyUnlockedIds;
+
+      await _showUnlockedAchievementsPopup(newlyUnlockedIds);
+      await _loadAchievements();
+      return newlyUnlockedIds;
+    } catch (e) {
+      debugPrint('[Achievement] falha ao reavaliar conquistas: $e');
+      return const <String>[];
+    }
+  }
+
   Future<void> _shareAchievement(Achievement achievement) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     try {
       await AchievementShareService.shareAchievement(achievement);
       if (userId != null) {
         await _firestoreService.incrementUserMetric(userId, 'shares');
+        unawaited(_handlePostShareFlow(userId));
       }
     } catch (e) {
       if (mounted) {
@@ -105,6 +228,18 @@ class AchievementsScreenState extends State<AchievementsScreen>
         );
       }
     }
+  }
+
+  Future<void> _handlePostShareFlow(String userId) async {
+    final newlyUnlockedIds = await _handleAchievementUnlockFlow(userId);
+
+    if (!mounted || newlyUnlockedIds.isEmpty) return;
+
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    await _tryShowInterstitial(
+      reason: 'achievement_screen_share',
+      waitForReady: const Duration(milliseconds: 1200),
+    );
   }
 
   Widget _buildAchievementIcon(Achievement achievement, bool isUnlocked) {
@@ -190,10 +325,10 @@ class AchievementsScreenState extends State<AchievementsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
-        iconTheme: IconThemeData(color: const Color(0xFFFFD700)),
-        title: Text(
+        iconTheme: const IconThemeData(color: Color(0xFFFFD700)),
+        title: const Text(
           'Conquistas',
-          style: TextStyle(color: const Color(0xFFFFD700)),
+          style: TextStyle(color: Color(0xFFFFD700)),
         ),
         backgroundColor: const Color.fromRGBO(11, 18, 34, 1.0),
         bottom: TabBar(
@@ -222,122 +357,148 @@ class AchievementsScreenState extends State<AchievementsScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                // Todas as conquistas
-                _buildAchievementsList(_achievements),
-
-                // Conquistas por quantidade
-                _buildAchievementsList(_achievements
-                    .where((a) => a.category == 'quantity')
-                    .toList()),
-                _buildAchievementsList(
-                    _achievements.where((a) => a.category == 'genre').toList()),
-
-                // Conquistas por diretor/franquia
-                _buildAchievementsList(_achievements
-                    .where(
-                      (a) =>
-                          a.category == 'director' || a.category == 'franchise',
-                    )
-                    .toList()),
-
-                // Conquistas por época/origem
-                _buildAchievementsList(_achievements
-                    .where(
-                      (a) => a.category == 'era' || a.category == 'origin',
-                    )
-                    .toList()),
-
-                // Conquistas sociais
-                _buildAchievementsList(_achievements
-                    .where(
-                      (a) => a.category == 'social',
-                    )
-                    .toList()),
-
-                // Conquistas especiais
-                _buildAchievementsList(_achievements
-                    .where(
-                      (a) => a.category == 'special',
-                    )
-                    .toList()),
+                _buildAchievementsGrid(_achievements),
+                _buildAchievementsGrid(
+                  _achievements.where((a) => a.category == 'quantity').toList(),
+                ),
+                _buildAchievementsGrid(
+                  _achievements.where((a) => a.category == 'genre').toList(),
+                ),
+                _buildAchievementsGrid(
+                  _achievements
+                      .where(
+                        (a) =>
+                            a.category == 'director' ||
+                            a.category == 'franchise',
+                      )
+                      .toList(),
+                ),
+                _buildAchievementsGrid(
+                  _achievements
+                      .where(
+                        (a) => a.category == 'era' || a.category == 'origin',
+                      )
+                      .toList(),
+                ),
+                _buildAchievementsGrid(
+                  _achievements.where((a) => a.category == 'social').toList(),
+                ),
+                _buildAchievementsGrid(
+                  _achievements.where((a) => a.category == 'special').toList(),
+                ),
               ],
             ),
     );
   }
 
-  Widget _buildAchievementsList(List<Achievement> achievements) {
-    if (achievements.isEmpty) {
-      return const Center(
-        child: Text(
-          'Nenhuma conquista disponível nesta categoria',
-          style: TextStyle(color: Colors.white),
-        ),
-      );
-    }
-
-    return ListView.builder(
+  Widget _buildAchievementsGrid(List<Achievement> achievements) {
+    return GridView.builder(
       padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.75,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
       itemCount: achievements.length,
       itemBuilder: (context, index) {
         final achievement = achievements[index];
         final isUnlocked = _isAchievementUnlocked(achievement.id);
         final userAchievement = _getUserAchievement(achievement.id);
+        final progress = userAchievement?.progress ?? 0;
+        final maxProgress = achievement.targetValue;
+        final progressValue = maxProgress > 0 ? progress / maxProgress : 0.0;
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          color: isUnlocked ? const Color(0xFF0047AB) : Colors.grey[800],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(
-              color: isUnlocked ? const Color(0xFFFFD700) : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: _buildAchievementIcon(achievement, isUnlocked),
-            title: Text(
-              achievement.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+        return GestureDetector(
+          onTap: isUnlocked ? () => _shareAchievement(achievement) : null,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color.fromRGBO(11, 18, 34, 1.0),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isUnlocked ? const Color(0xFFFFD700) : Colors.white24,
+                width: isUnlocked ? 2 : 1,
               ),
+              boxShadow: isUnlocked
+                  ? const [
+                      BoxShadow(
+                        color: Color.fromARGB(40, 255, 215, 0),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                        offset: Offset(0, 4),
+                      ),
+                    ]
+                  : const [],
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  achievement.description,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (!isUnlocked && userAchievement != null)
-                  LinearProgressIndicator(
-                    value: userAchievement.progress /
-                        (achievement.ruleValue as int),
-                    backgroundColor: Colors.grey[700],
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
-                  ),
-                if (isUnlocked)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
                     children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.share, color: Colors.white),
-                        label: const Text(
-                          'Compartilhar',
-                          style: TextStyle(color: Colors.white),
+                      _buildAchievementIcon(achievement, isUnlocked),
+                      const SizedBox(height: 12),
+                      Text(
+                        achievement.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isUnlocked
+                              ? const Color(0xFFFFD700)
+                              : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
-                        onPressed: () => _shareAchievement(achievement),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        achievement.description,
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
-              ],
+                  Column(
+                    children: [
+                      LinearProgressIndicator(
+                        value: progressValue.clamp(0.0, 1.0),
+                        backgroundColor: Colors.white12,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isUnlocked
+                              ? const Color(0xFFFFD700)
+                              : Colors.blueGrey,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '$progress / $maxProgress',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                      if (isUnlocked) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Toque para compartilhar',
+                          style: TextStyle(
+                            color: Color(0xFFFFD700),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
