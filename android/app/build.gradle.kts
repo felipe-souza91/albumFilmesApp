@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "album_filmes_app"//"com.example.album_filmes_app"
+    namespace = "com.album_filmes_app"//"com.example.album_filmes_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -30,7 +30,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "album_filmes_app"
+        applicationId = "com.album_filmes_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23
@@ -56,6 +56,24 @@ android {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
         }
+
+        release {
+
+            // Enables code-related app optimization.
+            isMinifyEnabled = true
+
+            // Enables resource shrinking.
+            isShrinkResources = true
+
+            proguardFiles(
+                // Default file with automatically generated optimization rules.
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+
+                
+            )
+            
+        }
+
     }
 }
 
