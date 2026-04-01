@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.album_filmes_app"//"com.example.album_filmes_app"
+    namespace = "com.album_filmes_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
