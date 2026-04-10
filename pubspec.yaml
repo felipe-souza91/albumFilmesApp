@@ -59,8 +59,7 @@ flutter:
     - assets/icons/achievements/
     - assets/logo.png
     - assets/logo_tiny.png
-    - assets/.env
-
+    
 flutter_icons:
   android: true
   ios: true
