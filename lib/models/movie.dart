@@ -13,6 +13,11 @@ class Movie {
   final String posterUrl;
   final bool isWatched;
   final double rating;
+  // BUG FIX: Adicionado campo para a nota do TMDB (vote_average, escala 0-10).
+  // Antes, o picker usava o campo 'rating' (estrelas do usuário, 0-5) como
+  // proxy de qualidade — mas filmes não-assistidos têm sempre rating=0,
+  // tornando o fator de qualidade inútil. Agora a nota real do TMDB é usada.
+  final double voteAverage;
 
   Movie({
     required this.id,
@@ -28,6 +33,7 @@ class Movie {
     required this.posterUrl,
     this.isWatched = false,
     this.rating = 0.0,
+    this.voteAverage = 5.0, // 5.0 = neutro para filmes sem nota
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -47,6 +53,9 @@ class Movie {
       posterUrl: json['posterUrl'] ?? '',
       isWatched: json['isWatched'] ?? false,
       rating: (json['rating'] ?? 0.0).toDouble(),
+      // BUG FIX: Lê voteAverage do Firestore; fallback 5.0 (neutro) para filmes
+      // já importados que ainda não têm este campo salvo.
+      voteAverage: (json['voteAverage'] as num?)?.toDouble() ?? 5.0,
     );
   }
 
@@ -65,6 +74,7 @@ class Movie {
       'posterUrl': posterUrl,
       'isWatched': isWatched,
       'rating': rating,
+      'voteAverage': voteAverage,
     };
   }
 
@@ -82,6 +92,7 @@ class Movie {
     String? posterUrl,
     bool? isWatched,
     double? rating,
+    double? voteAverage,
   }) {
     return Movie(
       id: id ?? this.id,
@@ -97,6 +108,7 @@ class Movie {
       posterUrl: posterUrl ?? this.posterUrl,
       isWatched: isWatched ?? this.isWatched,
       rating: rating ?? this.rating,
+      voteAverage: voteAverage ?? this.voteAverage,
     );
   }
 }

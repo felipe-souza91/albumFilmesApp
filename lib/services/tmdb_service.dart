@@ -43,8 +43,6 @@ class TMDBService {
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      //print('Erro ${response.statusCode} ao carregar detalhes de $movieId');
-      //print('Body: ${response.body}');
       throw Exception('Failed to load movie details: ${response.statusCode}');
     }
   }
@@ -64,7 +62,7 @@ class TMDBService {
           final movieDetails = await getMovieDetails(item['id']);
           movies.add(movieDetails);
         } catch (e) {
-          //print('Error fetching details for movie ${item['id']}: $e');
+          // Falha silenciosa por filme — continua com os demais
         }
       }
 
@@ -82,7 +80,6 @@ class TMDBService {
   List<String> extractKeywords(Map<String, dynamic> movieData) {
     final keywordsData = movieData['keywords'];
     if (keywordsData == null) return [];
-
     final List<dynamic> keywords = keywordsData['keywords'] ?? [];
     return keywords
         .map<String>((keyword) => keyword['name'].toString())
@@ -92,10 +89,8 @@ class TMDBService {
   List<String> extractPlatforms(Map<String, dynamic> movieData) {
     final watchProviders = movieData['watch/providers'];
     if (watchProviders == null) return [];
-
     final results = watchProviders['results'];
     if (results == null) return [];
-
     final brData = results['BR'];
     if (brData == null) return [];
 
@@ -104,11 +99,9 @@ class TMDBService {
     final List<dynamic> buy = brData['buy'] ?? [];
 
     final Set<String> platforms = {};
-
     for (var provider in [...flatrate, ...rent, ...buy]) {
       platforms.add(provider['provider_name'].toString());
     }
-
     return platforms.toList();
   }
 
@@ -116,6 +109,7 @@ class TMDBService {
     final List<dynamic> countries = movieData['production_countries'] ?? [];
     final List<dynamic> crew =
         (movieData['credits']?['crew'] ?? []) as List<dynamic>;
+
     String director = '';
     for (final person in crew) {
       if (person['job'] == 'Director') {
@@ -123,6 +117,21 @@ class TMDBService {
         break;
       }
     }
+
+    // BUG FIX: Inclui vote_average (nota TMDB, escala 0-10) e popularity no
+    // mapa salvo no Firestore. Antes, esses dados eram descartados no transform,
+    // fazendo com que o sorteio inteligente usasse rating=0 do usuário como
+    // proxy de qualidade — completamente inútil para filmes não-assistidos.
+    final double voteAverage =
+        (movieData['vote_average'] as num?)?.toDouble() ?? 0.0;
+
+    // Normaliza popularity para escala 0-1 usando um teto razoável de 500.
+    // Filmes com popularity > 500 são tratados como 1.0 (máximo).
+    // Esse valor normalizado é usado pelo fator de novelty no sorteio.
+    final double popularityRaw =
+        (movieData['popularity'] as num?)?.toDouble() ?? 0.0;
+    final double popularityNorm = (popularityRaw / 500.0).clamp(0.0, 1.0);
+
     return {
       'id': movieData['id'],
       'title': movieData['title'],
@@ -140,6 +149,9 @@ class TMDBService {
       'posterUrl': movieData['poster_path'] != null
           ? 'https://image.tmdb.org/t/p/w500${movieData['poster_path']}'
           : '',
+      // BUG FIX: Campos adicionados ao documento Firestore
+      'voteAverage': voteAverage,
+      'popularityNorm': popularityNorm,
       'isWatched': false,
       'rating': 0.0,
     };
