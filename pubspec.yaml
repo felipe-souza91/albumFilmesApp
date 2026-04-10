@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # BUG FIX: Adicionado para corrigir formato de data no DatePicker (pt-BR)
+  # e suporte a localização em todo o app
+  flutter_localizations:
+    sdk: flutter
   firebase_core: ^3.13.0
   cloud_firestore: ^5.6.6
   http: ^1.1.0
@@ -60,6 +64,6 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/logo_tiny.png" # Substitua pelo caminho do seu ícone
-  adaptive_icon_background: "#FFFFFF" # Cor de fundo (somente para Android)
+  image_path: "assets/logo_tiny.png"
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/logo_tiny.png"

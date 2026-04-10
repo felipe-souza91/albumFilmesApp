@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -52,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _photoUrl = (data['photoUrl'] ?? _photoUrl).toString();
       });
     } catch (_) {
-      // mantém fallback do Auth
+      // Mantém fallback do Auth em caso de falha no Firestore
     }
   }
 
@@ -91,10 +92,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao atualizar perfil: ${e.message}')),
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível atualizar o perfil.')),
+        SnackBar(content: Text('Não foi possível atualizar o perfil: $e')),
       );
     } finally {
       if (manageLoading && mounted) setState(() => _isSaving = false);
@@ -132,8 +133,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(context);
               await _updateProfile(name: controller.text);
             },
-            child: const Text('Salvar',
-                style: TextStyle(color: Color(0xFF0D1B2A))),
+            child: const Text('Salvar'),
           ),
         ],
       ),
@@ -156,21 +156,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       setState(() => _isSaving = true);
 
+      // BUG FIX: Usa File diretamente em vez de ler os bytes com readAsBytes().
+      // putFile() é mais confiável em Android (especialmente em Xiaomi/MIUI)
+      // pois evita problemas de memória e cancelamentos intermitentes do putData().
       final file = File(picked.path);
-      final bytes = await file.readAsBytes();
       final ext = p.extension(file.path).replaceFirst('.', '').toLowerCase();
       final fileExt = ext.isEmpty ? 'jpg' : ext;
-      final contentType = (fileExt == 'png')
+      final contentType = fileExt == 'png'
           ? 'image/png'
-          : (fileExt == 'webp')
+          : fileExt == 'webp'
               ? 'image/webp'
               : 'image/jpeg';
 
       final ref = FirebaseStorage.instance.ref().child(
           'users/${user.uid}/profile_${DateTime.now().millisecondsSinceEpoch}.$fileExt');
 
-      UploadTask startUpload() => ref.putData(
-            bytes,
+      // BUG FIX: Substituído putData(bytes) por putFile(file).
+      // putFile é mais estável em dispositivos Android e não exige carregar
+      // o arquivo inteiro na memória antes do upload.
+      UploadTask startUpload() => ref.putFile(
+            file,
             SettableMetadata(contentType: contentType),
           );
 
@@ -179,6 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         snapshot = await startUpload();
       } on FirebaseException catch (e) {
         if (e.code == 'canceled') {
+          // Tenta uma segunda vez em caso de cancelamento pelo sistema
           snapshot = await startUpload();
         } else {
           rethrow;
@@ -193,10 +199,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erro ao enviar foto: ${e.message ?? e.code}')),
       );
-    } catch (_) {
+    } catch (e) {
+      // BUG FIX: Exibe o erro real em vez de swallowá-lo com catch(_).
+      // Facilita diagnóstico de problemas de permissão e outros erros inesperados.
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível escolher a foto.')),
+        SnackBar(content: Text('Não foi possível escolher a foto: $e')),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -234,8 +242,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(context);
               await _updateProfile(photoUrl: controller.text);
             },
-            child: const Text('Salvar',
-                style: TextStyle(color: Color(0xFF0D1B2A))),
+            child: const Text('Salvar'),
           ),
         ],
       ),
@@ -344,8 +351,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }
             },
-            child: const Text('Alterar',
-                style: TextStyle(color: Color(0xFF0D1B2A))),
+            child: const Text('Alterar'),
           ),
         ],
       ),
@@ -472,12 +478,6 @@ class ProfilePic extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ImageProvider imageProvider;
-    if (photoUrl.trim().isNotEmpty) {
-      imageProvider = NetworkImage(photoUrl.trim());
-    } else {
-      imageProvider = const AssetImage('assets/icons/user.jpg');
-    }
     return SizedBox(
       height: 115,
       width: 115,
@@ -485,7 +485,43 @@ class ProfilePic extends StatelessWidget {
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
-          CircleAvatar(backgroundImage: imageProvider),
+          // BUG FIX: Substituído CircleAvatar(backgroundImage: NetworkImage(...))
+          // por ClipOval + CachedNetworkImage.
+          // Benefícios:
+          //  1) Tratamento de erros com fallback para avatar padrão
+          //  2) Cache gerenciado pelo CachedNetworkImage (evita recargas)
+          //  3) Exibe placeholder enquanto carrega, melhorando UX
+          ClipOval(
+            child: photoUrl.trim().isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: photoUrl.trim(),
+                    width: 115,
+                    height: 115,
+                    fit: BoxFit.cover,
+                    // Placeholder enquanto a imagem carrega
+                    placeholder: (context, url) => Container(
+                      color: const Color(0xFF1B263B),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white54,
+                        size: 50,
+                      ),
+                    ),
+                    // Fallback se a URL falhar (ex: link expirado, sem internet)
+                    errorWidget: (context, url, error) => Image.asset(
+                      'assets/icons/user.jpg',
+                      width: 115,
+                      height: 115,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Image.asset(
+                    'assets/icons/user.jpg',
+                    width: 115,
+                    height: 115,
+                    fit: BoxFit.cover,
+                  ),
+          ),
           Positioned(
             right: -16,
             bottom: 0,
@@ -505,7 +541,7 @@ class ProfilePic extends StatelessWidget {
                 child: SvgPicture.string(cameraIcon),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -544,15 +580,10 @@ class ProfileMenu extends StatelessWidget {
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(
-                  color: Color(0xFF757575),
-                ),
+                style: const TextStyle(color: Color(0xFF757575)),
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              color: Color(0xFF757575),
-            ),
+            const Icon(Icons.arrow_forward_ios, color: Color(0xFF757575)),
           ],
         ),
       ),

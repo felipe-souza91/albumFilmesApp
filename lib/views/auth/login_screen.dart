@@ -24,6 +24,34 @@ class LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // BUG FIX: Tradução completa dos códigos de erro do Firebase Auth para pt-BR.
+  // Versões mais recentes do Firebase usam 'invalid-credential' ao invés de
+  // 'user-not-found' / 'wrong-password' por motivos de segurança.
+  String _friendlyAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return 'Não encontramos uma conta com esse e-mail.';
+      case 'wrong-password':
+        return 'Senha incorreta. Tente novamente.';
+      // Firebase SDK moderno unifica credencial inválida neste código
+      case 'invalid-credential':
+      case 'INVALID_LOGIN_CREDENTIALS':
+        return 'E-mail ou senha incorretos. Verifique e tente novamente.';
+      case 'invalid-email':
+        return 'E-mail inválido. Verifique e tente novamente.';
+      case 'user-disabled':
+        return 'Essa conta foi desativada. Entre em contato com o suporte.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      case 'network-request-failed':
+        return 'Sem conexão. Verifique sua internet e tente novamente.';
+      case 'operation-not-allowed':
+        return 'Login por e-mail não está habilitado no momento.';
+      default:
+        return 'Não foi possível fazer login. Tente novamente.';
+    }
+  }
+
   Future<void> _forgotPassword({String? prefilledEmail}) async {
     final emailController = TextEditingController(text: prefilledEmail ?? '');
 
@@ -31,6 +59,10 @@ class LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (context) {
         bool isSending = false;
+        // BUG FIX: A mensagem de erro do dialog agora é exibida dentro do próprio
+        // dialog (usando setStateDialog), e não mais no formulário de login,
+        // que era o comportamento anterior incorreto.
+        String dialogError = '';
 
         return StatefulBuilder(
           builder: (context, setStateDialog) {
@@ -38,68 +70,63 @@ class LoginScreenState extends State<LoginScreen> {
               final email = emailController.text.trim();
 
               if (email.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content:
-                          Text('Digite seu e-mail para recuperar a senha.')),
-                );
+                setStateDialog(() {
+                  dialogError = 'Digite seu e-mail para recuperar a senha.';
+                });
                 return;
               }
               if (!email.contains('@')) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Digite um e-mail válido.')),
-                );
+                setStateDialog(() {
+                  dialogError = 'Digite um e-mail válido.';
+                });
                 return;
               }
 
-              setStateDialog(() => isSending = true);
+              setStateDialog(() {
+                isSending = true;
+                dialogError = '';
+              });
 
               try {
                 await FirebaseAuth.instance
                     .sendPasswordResetEmail(email: email);
 
-                if (!mounted) return;
+                if (!context.mounted) return;
+                Navigator.pop(context);
 
-                Navigator.pop(context); // fecha dialog
+                // Exibe confirmação no formulário de login
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
-                        'Enviamos um e-mail com o link de redefinição de senha.'),
+                        'E-mail de recuperação enviado. Verifique sua caixa de entrada.'),
                   ),
                 );
               } on FirebaseAuthException catch (e) {
-                setState(() {
-                  switch (e.code) {
-                    case 'user-not-found':
-                      _errorMessage =
-                          'Não encontramos uma conta com esse e-mail.';
-                      break;
-                    case 'wrong-password':
-                    case 'invalid-credential': // Firebase mais novo usa bastante esse
-                      _errorMessage = 'E-mail ou senha inválidos.';
-                      break;
-                    case 'invalid-email':
-                      _errorMessage =
-                          'E-mail inválido. Verifique e tente novamente.';
-                      break;
-                    case 'too-many-requests':
-                      _errorMessage =
-                          'Muitas tentativas. Tente novamente mais tarde.';
-                      break;
-                    case 'network-request-failed':
-                      _errorMessage =
-                          'Sem conexão. Verifique sua internet e tente novamente.';
-                      break;
-                    default:
-                      _errorMessage =
-                          'Não foi possível fazer login agora. Tente novamente.';
-                  }
+                // BUG FIX: Erro agora é exibido dentro do dialog, não no setState do login
+                String msg;
+                switch (e.code) {
+                  case 'user-not-found':
+                    msg = 'Não encontramos uma conta com esse e-mail.';
+                    break;
+                  case 'invalid-email':
+                    msg = 'E-mail inválido. Verifique e tente novamente.';
+                    break;
+                  case 'too-many-requests':
+                    msg = 'Muitas tentativas. Tente novamente mais tarde.';
+                    break;
+                  case 'network-request-failed':
+                    msg = 'Sem conexão. Verifique sua internet e tente novamente.';
+                    break;
+                  default:
+                    msg = 'Não foi possível enviar o e-mail. Tente novamente.';
+                }
+                setStateDialog(() {
+                  dialogError = msg;
                 });
               } catch (_) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Erro inesperado. Tente novamente.')),
-                );
+                setStateDialog(() {
+                  dialogError = 'Erro inesperado. Tente novamente.';
+                });
               } finally {
                 setStateDialog(() => isSending = false);
               }
@@ -112,27 +139,43 @@ class LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                     color: Color(0xFFFFD700), fontWeight: FontWeight.bold),
               ),
-              content: TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: const TextStyle(color: Color(0xFFFFD700)),
-                cursorColor: const Color(0xFFFFD700),
-                decoration: InputDecoration(
-                  hintText: 'Digite seu e-mail',
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  filled: true,
-                  fillColor: Colors.white10,
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.white24),
-                    borderRadius: BorderRadius.circular(10),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: Color(0xFFFFD700)),
+                    cursorColor: const Color(0xFFFFD700),
+                    decoration: InputDecoration(
+                      hintText: 'Digite seu e-mail',
+                      hintStyle: const TextStyle(color: Colors.white54),
+                      filled: true,
+                      fillColor: Colors.white10,
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: Colors.white24),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(
+                            color: Color(0xFFFFD700), width: 2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onSubmitted: (_) => isSending ? null : send(),
                   ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide:
-                        const BorderSide(color: Color(0xFFFFD700), width: 2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                onSubmitted: (_) => isSending ? null : send(),
+                  // BUG FIX: Mensagem de erro exibida corretamente dentro do dialog
+                  if (dialogError.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        dialogError,
+                        style: const TextStyle(
+                            color: Colors.redAccent, fontSize: 13),
+                      ),
+                    ),
+                ],
               ),
               actions: [
                 TextButton(
@@ -177,29 +220,24 @@ class LoginScreenState extends State<LoginScreen> {
 
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-                builder: (context) =>
-                    HomeScreen()), //chamada HomeScreen() para a tela inicial do app
+            MaterialPageRoute(builder: (context) => HomeScreen()),
           );
         }
       } on FirebaseAuthException catch (e) {
+        // BUG FIX: Usa o método centralizado de tradução de erros
         setState(() {
-          if (e.code == 'user-not-found') {
-            _errorMessage = 'Usuário não encontrado para este email.';
-          } else if (e.code == 'wrong-password') {
-            _errorMessage = 'Senha incorreta.';
-          } else {
-            _errorMessage = 'Erro ao fazer login: ${e.message}';
-          }
+          _errorMessage = _friendlyAuthError(e);
         });
       } catch (e) {
         setState(() {
-          _errorMessage = 'Erro ao fazer login: $e';
+          _errorMessage = 'Erro inesperado ao fazer login. Tente novamente.';
         });
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -208,37 +246,34 @@ class LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        color: Color.fromRGBO(11, 18, 34, 1.0),
+        color: const Color.fromRGBO(11, 18, 34, 1.0),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo
                   Image.asset('assets/logo_tiny.png', width: 300, height: 300),
-
-                  // Formulário de login
                   Container(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Email',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               filled: true,
                               fillColor: Colors.white,
                               border: OutlineInputBorder(),
@@ -254,19 +289,19 @@ class LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Password',
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Senha',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           TextFormField(
                             controller: _passwordController,
                             obscureText: true,
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               filled: true,
                               fillColor: Colors.white,
                               border: OutlineInputBorder(),
@@ -282,7 +317,7 @@ class LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
@@ -294,33 +329,53 @@ class LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
+                          // BUG FIX: Mensagem de erro exibida com visual adequado
                           if (_errorMessage.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                _errorMessage,
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: Colors.red.withOpacity(0.5)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline,
+                                        color: Colors.redAccent, size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _errorMessage,
+                                        style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           SizedBox(
                             width: double.infinity,
                             height: 50,
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _login,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFFFFD700),
+                                backgroundColor: const Color(0xFFFFD700),
                               ),
                               child: _isLoading
-                                  ? CircularProgressIndicator(
+                                  ? const CircularProgressIndicator(
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFFFD700)),
+                                          Color(0xFF0D1B2A)),
                                     )
-                                  : Text(
-                                      'Login',
+                                  : const Text(
+                                      'Entrar',
                                       style: TextStyle(
                                         color: Color(0xFF0D1B2A),
                                         fontSize: 16,
@@ -329,17 +384,14 @@ class LoginScreenState extends State<LoginScreen> {
                                     ),
                             ),
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           Center(
                             child: TextButton(
                               onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/signup',
-                                );
+                                Navigator.pushNamed(context, '/signup');
                               },
-                              child: Text(
-                                'Cadastre-se',
+                              child: const Text(
+                                'Ainda não tem conta? Cadastre-se',
                                 style: TextStyle(
                                   color: Colors.white,
                                   decoration: TextDecoration.underline,
@@ -347,7 +399,7 @@ class LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                         ],
                       ),
                     ),

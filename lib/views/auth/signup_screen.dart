@@ -13,6 +13,8 @@ class SignUpScreenState extends State<SignUpScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  // BUG FIX: Adicionado controller para confirmação de senha
+  final _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
 
@@ -23,6 +25,8 @@ class SignUpScreenState extends State<SignUpScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    // BUG FIX: Dispose do novo controller
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -54,7 +58,6 @@ class SignUpScreenState extends State<SignUpScreen> {
   }
 
   String _friendlyFirestoreError(FirebaseException e) {
-    // O “The caller does not have permission…” costuma cair em permission-denied
     switch (e.code) {
       case 'permission-denied':
         return 'Não foi possível salvar seu perfil agora. Tente novamente.';
@@ -71,8 +74,10 @@ class SignUpScreenState extends State<SignUpScreen> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    // BUG FIX: Lê o campo de confirmação de senha
+    final confirmPassword = _confirmPasswordController.text;
 
-    // Validações simples e claras
+    // Validações
     if (name.isEmpty) {
       _showMessage('Digite seu nome.', isError: true);
       return;
@@ -89,6 +94,12 @@ class SignUpScreenState extends State<SignUpScreen> {
       _showMessage('A senha deve ter pelo menos 6 caracteres.', isError: true);
       return;
     }
+    // BUG FIX: Validação de confirmação de senha
+    if (password != confirmPassword) {
+      _showMessage('As senhas não conferem. Verifique e tente novamente.',
+          isError: true);
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -103,13 +114,10 @@ class SignUpScreenState extends State<SignUpScreen> {
 
       final uid = userCredential.user?.uid;
       if (uid == null) {
-        throw FirebaseAuthException(
-          code: 'unknown',
-          message: 'UID ausente',
-        );
+        throw FirebaseAuthException(code: 'unknown', message: 'UID ausente');
       }
 
-      // 2) Salva perfil no Firestore (use serverTimestamp)
+      // 2) Salva perfil no Firestore
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'email': email,
         'name': name,
@@ -121,19 +129,15 @@ class SignUpScreenState extends State<SignUpScreen> {
     } on FirebaseAuthException catch (e) {
       _showMessage(_friendlyAuthError(e), isError: true);
     } on FirebaseException catch (e) {
-      // Se Auth criou a conta mas Firestore falhou, evita “conta fantasma”
-      // (você pode trocar isso por “continuar e salvar depois”, mas aqui é o mais seguro pro beta)
+      // Se Auth criou a conta mas Firestore falhou, evita "conta fantasma"
       try {
         await userCredential?.user?.delete();
       } catch (_) {}
-
       _showMessage(_friendlyFirestoreError(e), isError: true);
     } catch (_) {
-      // fallback genérico
       try {
         await userCredential?.user?.delete();
       } catch (_) {}
-
       _showMessage('Erro inesperado ao cadastrar. Tente novamente.',
           isError: true);
     } finally {
@@ -167,6 +171,7 @@ class SignUpScreenState extends State<SignUpScreen> {
                 children: [
                   Image.asset('assets/logo_tiny.png', width: 300, height: 300),
                   const SizedBox(height: 20),
+                  // Campo: Nome
                   TextField(
                     controller: _nameController,
                     decoration: const InputDecoration(
@@ -179,6 +184,7 @@ class SignUpScreenState extends State<SignUpScreen> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 20),
+                  // Campo: E-mail
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
@@ -192,6 +198,7 @@ class SignUpScreenState extends State<SignUpScreen> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
+                  // Campo: Senha
                   TextField(
                     controller: _passwordController,
                     decoration: const InputDecoration(
@@ -202,7 +209,22 @@ class SignUpScreenState extends State<SignUpScreen> {
                       prefixIcon: Icon(Icons.lock),
                     ),
                     obscureText: true,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 16),
+                  // BUG FIX: Campo de confirmação de senha adicionado
+                  TextField(
+                    controller: _confirmPasswordController,
+                    decoration: const InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(),
+                      hintText: 'Confirme sua senha',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                    obscureText: true,
                     textInputAction: TextInputAction.done,
+                    // Submete ao pressionar "Done" no teclado
                     onSubmitted: (_) => _isLoading ? null : _signUp(),
                   ),
                   const SizedBox(height: 24),
@@ -219,7 +241,8 @@ class SignUpScreenState extends State<SignUpScreen> {
                               backgroundColor: const Color(0xFFFFD700),
                               foregroundColor:
                                   const Color.fromRGBO(11, 18, 34, 1.0),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                             ),
                             child: const Text(
                               'Cadastrar',
