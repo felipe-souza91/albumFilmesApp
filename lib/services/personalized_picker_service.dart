@@ -364,7 +364,9 @@ class PersonalizedPickerService {
     if (l.contains('ação')      || l.contains('action'))          return 'action';
     if (l.contains('ficção')    || l.contains('science fiction')
                                  || l.contains('sci-fi')
-                                 || l.contains('sci fi'))          return 'scifi';
+                                 || l.contains('sci fi')) {
+      return 'scifi';
+    }
     if (l.contains('guerra')    || l.contains('war'))              return 'war';
     if (l.contains('suspense')  || l.contains('thriller'))         return 'thriller';
     if (l.contains('terror')    || l.contains('horror'))           return 'horror';
@@ -389,11 +391,17 @@ class PersonalizedPickerService {
     if (g.any((s) => s.contains('ação')     || s.contains('action')))   energy += 0.30;
     if (g.any((s) => s.contains('aventura') || s.contains('adventure'))) energy += 0.20;
     if (g.any((s) => s.contains('comédia')  || s.contains('comedy')
-                  || s.contains('animação') || s.contains('animation'))) energy += 0.15;
+                  || s.contains('animação') || s.contains('animation'))) {
+      energy += 0.15;
+    }
     if (g.any((s) => s.contains('drama')    || s.contains('romance')
-                  || s.contains('biografia')|| s.contains('biography'))) energy -= 0.15;
+                  || s.contains('biografia')|| s.contains('biography'))) {
+      energy -= 0.15;
+    }
     if (g.any((s) => s.contains('terror')   || s.contains('horror')
-                  || s.contains('suspense') || s.contains('thriller')))  energy += 0.10;
+                  || s.contains('suspense') || s.contains('thriller'))) {
+      energy += 0.10;
+    }
     return energy.clamp(0.0, 1.0);
   }
 
@@ -401,14 +409,22 @@ class PersonalizedPickerService {
     final g = c.genres.map((e) => e.toLowerCase()).toSet();
     double depth = 0.5;
     if (g.any((s) => s.contains('drama')    || s.contains('biografia')
-                  || s.contains('biography')))                            depth += 0.30;
+                  || s.contains('biography'))) {
+      depth += 0.30;
+    }
     if (g.any((s) => s.contains('ficção')   || s.contains('science fiction')
-                  || s.contains('sci-fi')))                               depth += 0.20;
+                  || s.contains('sci-fi'))) {
+      depth += 0.20;
+    }
     if (g.any((s) => s.contains('guerra')   || s.contains('war')))       depth += 0.15;
     if (g.any((s) => s.contains('terror')   || s.contains('horror')
-                  || s.contains('suspense') || s.contains('thriller')))  depth += 0.10;
+                  || s.contains('suspense') || s.contains('thriller'))) {
+      depth += 0.10;
+    }
     if (g.any((s) => s.contains('comédia')  || s.contains('comedy')
-                  || s.contains('animação') || s.contains('animation'))) depth -= 0.20;
+                  || s.contains('animação') || s.contains('animation'))) {
+      depth -= 0.20;
+    }
     return depth.clamp(0.0, 1.0);
   }
 
@@ -416,12 +432,16 @@ class PersonalizedPickerService {
     final g = c.genres.map((e) => e.toLowerCase()).toSet();
     double comfort = 0.5;
     if (g.any((s) => s.contains('comédia')  || s.contains('comedy')
-                  || s.contains('animação') || s.contains('animation'))) comfort += 0.20;
+                  || s.contains('animação') || s.contains('animation'))) {
+      comfort += 0.20;
+    }
     if (g.any((s) => s.contains('romance')))                              comfort += 0.20;
     if (g.any((s) => s.contains('família')  || s.contains('family')))    comfort += 0.15;
     if (g.any((s) => s.contains('terror')   || s.contains('horror')
                   || s.contains('suspense') || s.contains('thriller')
-                  || s.contains('guerra')   || s.contains('war')))       comfort -= 0.30;
+                  || s.contains('guerra')   || s.contains('war'))) {
+      comfort -= 0.30;
+    }
     return comfort.clamp(0.0, 1.0);
   }
 
