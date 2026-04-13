@@ -229,6 +229,9 @@ class LoginScreenState extends State<LoginScreen> {
           _errorMessage = _friendlyAuthError(e);
         });
       } catch (e) {
+        // BUG FIX: loga o erro real para facilitar diagnóstico futuro.
+        // Causa mais comum: Firebase não inicializado (API key ausente/inválida).
+        debugPrint('[Login] Erro inesperado: $e');
         setState(() {
           _errorMessage = 'Erro inesperado ao fazer login. Tente novamente.';
         });
@@ -337,10 +340,10 @@ class LoginScreenState extends State<LoginScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.15),
+                                  color: Colors.red.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                      color: Colors.red.withOpacity(0.5)),
+                                      color: Colors.red.withValues(alpha: 0.5)),
                                 ),
                                 child: Row(
                                   children: [

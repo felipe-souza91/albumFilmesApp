@@ -1,5 +1,6 @@
 // lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/movie.dart';
 
 class FirestoreService {
@@ -268,5 +269,76 @@ class FirestoreService {
     if (count is int) return count;
     if (count is num) return count.toInt();
     return 0;
+  }
+
+  /// LGPD: exclui todos os dados do usuário do Firestore e do Storage.
+  ///
+  /// Coleções limpas:
+  ///   - users/{uid}
+  ///   - user_movies/{uid}_*
+  ///   - user_achievements/{uid}_*
+  ///   - user_metrics/{uid}_*
+  ///   - user_preferences/{uid}
+  ///   - user_answers/{uid}/versions/*
+  ///   - Storage: users/{uid}/**
+  ///
+  /// A exclusão da conta no Firebase Auth fica a cargo do caller
+  /// (profile_screen.dart), que precisa fazer reauthenticate antes.
+  Future<void> deleteAllUserData(String userId) async {
+    // Helper: deleta todos os docs de uma coleção com userId == uid
+    Future<void> deleteCollection(String collection) async {
+      final snap = await _firestore
+          .collection(collection)
+          .where('userId', isEqualTo: userId)
+          .get();
+      final batch = _firestore.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      if (snap.docs.isNotEmpty) await batch.commit();
+    }
+
+    // 1) Coleções com campo userId
+    await deleteCollection(userMoviesCollection);
+    await deleteCollection(userAchievementsCollection);
+    await deleteCollection(userMetricsCollection);
+
+    // 2) Documentos com chave igual ao uid
+    await _firestore
+        .collection(usersCollection)
+        .doc(userId)
+        .delete();
+
+    await _firestore
+        .collection('user_preferences')
+        .doc(userId)
+        .delete();
+
+    // 3) Sub-coleção user_answers/{uid}/versions/*
+    final versionsSnap = await _firestore
+        .collection('user_answers')
+        .doc(userId)
+        .collection('versions')
+        .get();
+    final versionsBatch = _firestore.batch();
+    for (final doc in versionsSnap.docs) {
+      versionsBatch.delete(doc.reference);
+    }
+    if (versionsSnap.docs.isNotEmpty) await versionsBatch.commit();
+    // Deleta o documento pai após esvaziar a sub-coleção
+    await _firestore.collection('user_answers').doc(userId).delete();
+
+    // 4) Firebase Storage: remove todos os arquivos em users/{uid}/
+    try {
+      final storageRef =
+          FirebaseStorage.instance.ref().child('users/$userId');
+      final listResult = await storageRef.listAll();
+      for (final item in listResult.items) {
+        await item.delete();
+      }
+    } on FirebaseException catch (e) {
+      // Se o diretório não existir (object-not-found), ignora silenciosamente
+      if (e.code != 'object-not-found') rethrow;
+    }
   }
 }

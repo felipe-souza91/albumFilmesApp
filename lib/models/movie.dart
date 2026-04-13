@@ -13,11 +13,19 @@ class Movie {
   final String posterUrl;
   final bool isWatched;
   final double rating;
-  // BUG FIX: Adicionado campo para a nota do TMDB (vote_average, escala 0-10).
-  // Antes, o picker usava o campo 'rating' (estrelas do usuário, 0-5) como
-  // proxy de qualidade — mas filmes não-assistidos têm sempre rating=0,
-  // tornando o fator de qualidade inútil. Agora a nota real do TMDB é usada.
+
+  /// Nota do TMDB (vote_average), escala 0-10.
+  /// Filmes já no Firestore sem este campo recebem 5.0 (neutro) como fallback.
+  /// Antes, o picker usava [rating] (estrelas do usuário, sempre 0 para
+  /// não-assistidos), tornando o fator de qualidade completamente inútil.
   final double voteAverage;
+
+  /// Popularidade normalizada do TMDB, escala 0-1 (calculada como popularity/500).
+  /// Usada pelo fator de novelty no sorteio personalizado.
+  /// Filmes já no Firestore sem este campo recebem 0.5 (neutro) como fallback.
+  /// CORREÇÃO: antes era hardcoded em 0.5 diretamente no home_screen.dart,
+  /// cegando o fator de novelty para todos os filmes.
+  final double popularityNorm;
 
   Movie({
     required this.id,
@@ -33,7 +41,8 @@ class Movie {
     required this.posterUrl,
     this.isWatched = false,
     this.rating = 0.0,
-    this.voteAverage = 5.0, // 5.0 = neutro para filmes sem nota
+    this.voteAverage = 5.0,
+    this.popularityNorm = 0.5,
   });
 
   factory Movie.fromJson(Map<String, dynamic> json) {
@@ -53,9 +62,10 @@ class Movie {
       posterUrl: json['posterUrl'] ?? '',
       isWatched: json['isWatched'] ?? false,
       rating: (json['rating'] ?? 0.0).toDouble(),
-      // BUG FIX: Lê voteAverage do Firestore; fallback 5.0 (neutro) para filmes
-      // já importados que ainda não têm este campo salvo.
+      // Fallback 5.0 = neutro para filmes importados antes desta correção
       voteAverage: (json['voteAverage'] as num?)?.toDouble() ?? 5.0,
+      // Fallback 0.5 = neutro para filmes importados antes desta correção
+      popularityNorm: (json['popularityNorm'] as num?)?.toDouble() ?? 0.5,
     );
   }
 
@@ -75,6 +85,7 @@ class Movie {
       'isWatched': isWatched,
       'rating': rating,
       'voteAverage': voteAverage,
+      'popularityNorm': popularityNorm,
     };
   }
 
@@ -93,6 +104,7 @@ class Movie {
     bool? isWatched,
     double? rating,
     double? voteAverage,
+    double? popularityNorm,
   }) {
     return Movie(
       id: id ?? this.id,
@@ -109,6 +121,7 @@ class Movie {
       isWatched: isWatched ?? this.isWatched,
       rating: rating ?? this.rating,
       voteAverage: voteAverage ?? this.voteAverage,
+      popularityNorm: popularityNorm ?? this.popularityNorm,
     );
   }
 }

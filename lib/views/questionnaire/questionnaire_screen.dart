@@ -17,7 +17,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   int _currentPage = 0;
   bool _isSaving = false;
 
-  // Respostas (índices das opções)
   int? _colorMain;
   int? _colorLeast;
   int? _musicStyle;
@@ -49,6 +48,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
     'Fantasia',
     'Guerra / Histórico',
     'Biografia',
+    'Drama',
   ];
 
   DateTime? _birthDate;
@@ -74,7 +74,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
   Future<void> _nextPageOrFinish() async {
     if (!_canGoNext) return;
-
     if (_isLastPage) {
       await _saveQuestionnaire();
     } else {
@@ -107,30 +106,34 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       helpText: 'Escolha seu aniversário (opcional)',
       cancelText: 'Pular',
       confirmText: 'OK',
-      // BUG FIX: Locale forçado para pt-BR para exibir a data no formato
-      // DD/MM/AAAA em vez do formato americano MM/DD/YYYY.
-      // Requer flutter_localizations no pubspec.yaml e localizationsDelegates
-      // configurados no MaterialApp (já feito em main.dart).
+      // BUG FIX: locale forçado para pt-BR garante formato DD/MM/AAAA no calendário.
       locale: const Locale('pt', 'BR'),
+      // BUG FIX: calendarOnly remove o botão de alternar para digitação manual.
+      // O Flutter tem um bug conhecido onde o campo de texto do DatePicker ignora
+      // o locale e sempre exibe MM/DD/AAAA (formato americano). Como não há
+      // correção via parâmetro, a solução é desabilitar esse modo — o calendário
+      // já está em pt-BR e é a interface ideal para seleção de data de nascimento.
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
       builder: (context, child) {
-        // BUG FIX: Corrigido o esquema de cores do DatePicker.
-        // 'onPrimary' define a cor do texto sobre o fundo dourado (seleção).
-        // 'secondary' define a cor de destaque secundário.
+        // CORREÇÃO DE CORES: esquema completo para o DatePicker no tema escuro.
+        // 'onPrimary' define a cor do texto sobre o fundo dourado (data selecionada).
+        // Sem ele, o texto ficava ilegível (branco sobre dourado).
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.dark(
-              primary: Color(0xFFFFD700),       // cor de destaque (seleção)
-              onPrimary: Color(0xFF0D1B2A),     // texto sobre o fundo dourado
+              primary: Color(0xFFFFD700),       // fundo do elemento selecionado
+              onPrimary: Color(0xFF0D1B2A),     // texto sobre fundo dourado
               surface: Color(0xFF0D1B2A),       // fundo do dialog
-              onSurface: Colors.white,          // texto geral
-              secondary: Color(0xFFFFD700),
-              onSecondary: Color(0xFF0D1B2A),
+              onSurface: Colors.white,          // texto geral do calendário
+              secondary: Color(0xFFFFD700),     // elementos secundários
+              onSecondary: Color(0xFF0D1B2A),   // texto sobre elementos secundários
             ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFFFD700),
+                foregroundColor: const Color(0xFFFFD700), // botões Pular/OK
               ),
             ),
+            dialogBackgroundColor: const Color(0xFF0D1B2A),
           ),
           child: child!,
         );
@@ -146,16 +149,14 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
 
   Future<void> _saveQuestionnaire() async {
     setState(() => _isSaving = true);
-
     try {
       final prefs = _buildUserPreferencesFromAnswers();
       await UserPreferencesService.instance.saveCurrentUserPreferences(prefs);
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Questionário salvo! Vamos te conhecer melhor 😉'),
-        ),
+            content:
+                Text('Questionário salvo! Vamos te conhecer melhor 😉')),
       );
       Navigator.of(context).pop(prefs);
     } catch (e) {
@@ -187,7 +188,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 3: energyFromColor = 0.6; break;
       default: energyFromColor = 0.5;
     }
-
     double energyFromMusic;
     switch (musicStyle) {
       case 0: energyFromMusic = 0.9; break;
@@ -196,7 +196,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 3: energyFromMusic = 0.5; break;
       default: energyFromMusic = 0.5;
     }
-
     double energyFromPurpose;
     switch (musicPurpose) {
       case 0: energyFromPurpose = 0.9; break;
@@ -205,7 +204,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 3: energyFromPurpose = 0.5; break;
       default: energyFromPurpose = 0.5;
     }
-
     double energy =
         ((energyFromColor + energyFromMusic + energyFromPurpose) / 3)
             .clamp(0.0, 1.0);
@@ -218,7 +216,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 0: depthFromColor = 0.3; break;
       default: depthFromColor = 0.5;
     }
-
     double depthFromMusic;
     switch (musicStyle) {
       case 2: depthFromMusic = 0.9; break;
@@ -227,7 +224,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 0: depthFromMusic = 0.4; break;
       default: depthFromMusic = 0.5;
     }
-
     double depthFromWhenTired;
     switch (whenTired) {
       case 2: depthFromWhenTired = 0.9; break;
@@ -236,7 +232,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 3: depthFromWhenTired = 0.6; break;
       default: depthFromWhenTired = 0.5;
     }
-
     double depth =
         ((depthFromColor + depthFromMusic + depthFromWhenTired) / 3)
             .clamp(0.0, 1.0);
@@ -249,7 +244,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 2: comfortFromColor = 0.3; break;
       default: comfortFromColor = 0.5;
     }
-
     double comfortFromWhenTired;
     switch (whenTired) {
       case 0: comfortFromWhenTired = 0.9; break;
@@ -258,7 +252,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 3: comfortFromWhenTired = 0.3; break;
       default: comfortFromWhenTired = 0.5;
     }
-
     double comfort =
         ((comfortFromColor + comfortFromWhenTired) / 2).clamp(0.0, 1.0);
 
@@ -278,12 +271,10 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       case 0: intensityFromWhenTired = 0.3; break;
       default: intensityFromWhenTired = 0.5;
     }
-
     double penalty = 0.0;
     if (_avoidTags.contains('violence_graphic')) penalty += 0.3;
     if (_avoidTags.contains('terror_supernatural')) penalty += 0.2;
     if (_avoidTags.contains('sad_heavy')) penalty += 0.2;
-
     double intensityTolerance =
         max(0.0, intensityFromWhenTired - penalty).clamp(0.0, 1.0);
 
@@ -305,9 +296,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       }
     }
 
-    final nostalgiaChildhood = mapNostalgia(nostalgiaChildhoodChoice);
-    final nostalgiaTeen = mapNostalgia(nostalgiaTeenChoice);
-
     double oldMoviesAffinity;
     switch (oldMoviesChoice) {
       case 0: oldMoviesAffinity = 0.2; break;
@@ -328,8 +316,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       birthYear: _birthDate?.year,
       birthMonth: _birthDate?.month,
       birthDay: _birthDate?.day,
-      nostalgiaChildhood: nostalgiaChildhood,
-      nostalgiaTeen: nostalgiaTeen,
+      nostalgiaChildhood: mapNostalgia(nostalgiaChildhoodChoice),
+      nostalgiaTeen: mapNostalgia(nostalgiaTeenChoice),
       oldMoviesAffinity: oldMoviesAffinity,
       respectAgeRating: _respectAgeRating,
       favoriteGenres: _favoriteGenres.toList(),
@@ -365,9 +353,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             child: PageView(
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (idx) {
-                setState(() => _currentPage = idx);
-              },
+              onPageChanged: (idx) => setState(() => _currentPage = idx),
               children: [
                 _buildPage1(context),
                 _buildPage2(context),
@@ -375,9 +361,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
               ],
             ),
           ),
-          // BUG FIX: SafeArea adicionado para proteger os botões inferiores
-          // em dispositivos com barra de gestos (Xiaomi MIUI e similares),
-          // evitando que fiquem escondidos atrás da barra de navegação do sistema.
+          // SafeArea protege os botões da barra de gestos em Xiaomi e similares
           SafeArea(
             top: false,
             child: Padding(
@@ -388,10 +372,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
                   if (_currentPage > 0)
                     TextButton(
                       onPressed: _isSaving ? null : _prevPage,
-                      child: const Text(
-                        'Voltar',
-                        style: TextStyle(color: Color(0xFFFFD700)),
-                      ),
+                      child: const Text('Voltar',
+                          style: TextStyle(color: Color(0xFFFFD700))),
                     )
                   else
                     const SizedBox(width: 72),
@@ -408,9 +390,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                                strokeWidth: 2, color: Colors.white),
                           )
                         : Text(_isLastPage ? 'Concluir' : 'Próximo'),
                   ),
@@ -448,7 +428,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       birthLabel = 'Selecionar data (opcional)';
     } else {
       final d = _birthDate!;
-      // BUG FIX: Exibe data no formato brasileiro DD/MM/AAAA na label do botão
+      // Exibe sempre no formato brasileiro DD/MM/AAAA
       birthLabel =
           '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
     }
@@ -458,17 +438,14 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Primeiro, vamos entender a sua vibe 🎨🎧',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                ),
-          ),
+          Text('Primeiro, vamos entender a sua vibe 🎨🎧',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: Colors.white)),
           const SizedBox(height: 16),
-          const Text(
-            'Qual o seu aniversário? (opcional)',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('Qual o seu aniversário? (opcional)',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
@@ -485,30 +462,22 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 24),
-          const Text(
-            '1) Qual dessas paletas combina mais com você?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('1) Qual dessas paletas combina mais com você?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _ColorPaletteSelector(
-            selectedIndex: _colorMain,
-            onSelected: (idx) => setState(() => _colorMain = idx),
-          ),
+              selectedIndex: _colorMain,
+              onSelected: (idx) => setState(() => _colorMain = idx)),
           const SizedBox(height: 16),
-          const Text(
-            '2) E qual você menos se identifica?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('2) E qual você menos se identifica?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _ColorPaletteSelector(
-            selectedIndex: _colorLeast,
-            onSelected: (idx) => setState(() => _colorLeast = idx),
-          ),
+              selectedIndex: _colorLeast,
+              onSelected: (idx) => setState(() => _colorLeast = idx)),
           const SizedBox(height: 24),
-          const Text(
-            '3) Que tipo de música te acompanha mais no dia a dia?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('3) Que tipo de música te acompanha mais no dia a dia?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const [
@@ -521,10 +490,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             onSelected: (idx) => setState(() => _musicStyle = idx),
           ),
           const SizedBox(height: 16),
-          const Text(
-            '4) Música pra você serve mais para…',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('4) Música pra você serve mais para…',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const [
@@ -547,17 +514,14 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Agora, como você vive os filmes 🧠',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                ),
-          ),
+          Text('Agora, como você vive os filmes 🧠',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: Colors.white)),
           const SizedBox(height: 16),
-          const Text(
-            '5) Quando você está cansado, que tipo de filme mais te atrai?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('5) Quando você está cansado, que tipo de filme mais te atrai?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const [
@@ -570,10 +534,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             onSelected: (idx) => setState(() => _whenTired = idx),
           ),
           const SizedBox(height: 16),
-          const Text(
-            '6) Você mais assiste filmes…',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('6) Você mais assiste filmes…',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const [
@@ -586,10 +548,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             onSelected: (idx) => setState(() => _withWhom = idx),
           ),
           const SizedBox(height: 16),
-          const Text(
-            '7) E sobre descobrir filmes novos?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('7) E sobre descobrir filmes novos?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const [
@@ -601,10 +561,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             onSelected: (idx) => setState(() => _noveltyChoice = idx),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Você gosta de rever filmes da sua infância?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('Você gosta de rever filmes da sua infância?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const ['Quase nunca', 'Às vezes', 'Amo demais!'],
@@ -612,10 +570,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             onSelected: (idx) => setState(() => _nostalgiaChildhood = idx),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'E filmes da sua adolescência?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('E filmes da sua adolescência?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const ['Quase nunca', 'Às vezes', 'Amo demais!'],
@@ -623,10 +579,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             onSelected: (idx) => setState(() => _nostalgiaTeen = idx),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Quais gêneros você mais gosta?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('Quais gêneros você mais gosta?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           const Text(
             'Você pode escolher até 5. Esses gêneros terão um peso especial no sorteio personalizado.',
@@ -663,10 +617,8 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             }).toList(),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'E quais gêneros quase nunca te animam?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('E quais gêneros quase nunca te animam?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           const Text(
             'Eles terão menos chance de aparecer no sorteio personalizado.',
@@ -711,17 +663,14 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Por fim, seus limites e conforto ⚠️',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                ),
-          ),
+          Text('Por fim, seus limites e conforto ⚠️',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(color: Colors.white)),
           const SizedBox(height: 16),
-          const Text(
-            '8) Tem algum tipo de filme que você prefere evitar?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('8) Tem algum tipo de filme que você prefere evitar?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -731,15 +680,12 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
               _buildAvoidChip(label: 'Terror sobrenatural', tag: 'terror_supernatural'),
               _buildAvoidChip(label: 'Filmes muito tristes', tag: 'sad_heavy'),
               _buildAvoidChip(label: 'Temas muito sensíveis', tag: 'sensitive_topics'),
-              _buildAvoidChip(
-                  label: 'Nenhum em especial', tag: 'none', isExclusive: true),
+              _buildAvoidChip(label: 'Nenhum em especial', tag: 'none', isExclusive: true),
             ],
           ),
           const SizedBox(height: 24),
-          const Text(
-            '9) Duração confortável de filme',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('9) Duração confortável de filme',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           Slider(
             min: 60,
@@ -749,15 +695,11 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             value: _maxRuntime,
             onChanged: (v) => setState(() => _maxRuntime = v),
           ),
-          Text(
-            'Até ${_maxRuntime.round()} minutos',
-            style: const TextStyle(color: Colors.white70),
-          ),
+          Text('Até ${_maxRuntime.round()} minutos',
+              style: const TextStyle(color: Colors.white70)),
           const SizedBox(height: 16),
-          const Text(
-            '10) E os filmes mais antigos (por exemplo, antes dos anos 90)?',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Text('10) E os filmes mais antigos (por exemplo, antes dos anos 90)?',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 8),
           _OptionChips(
             options: const [
@@ -773,13 +715,11 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             contentPadding: EdgeInsets.zero,
             activeColor: const Color(0xFFFFD700),
             title: const Text(
-              'Respeitar classificação indicativa pela sua idade',
-              style: TextStyle(color: Colors.white),
-            ),
+                'Respeitar classificação indicativa pela sua idade',
+                style: TextStyle(color: Colors.white)),
             subtitle: const Text(
-              'Se ligado, vamos evitar sugerir filmes acima da sua faixa etária.',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
+                'Se ligado, vamos evitar sugerir filmes acima da sua faixa etária.',
+                style: TextStyle(color: Colors.white70, fontSize: 12)),
             value: _respectAgeRating,
             onChanged: (v) => setState(() => _respectAgeRating = v),
           ),
@@ -795,11 +735,9 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   }) {
     final isSelected = _avoidTags.contains(tag);
     return FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-            color: isSelected ? const Color(0xFF0D1B2A) : Colors.white),
-      ),
+      label: Text(label,
+          style: TextStyle(
+              color: isSelected ? const Color(0xFF0D1B2A) : Colors.white)),
       selected: isSelected,
       selectedColor: const Color(0xFFFFD700),
       backgroundColor: const Color(0xFF1B263B),
@@ -810,9 +748,7 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
             if (isSelected) {
               _avoidTags.remove(tag);
             } else {
-              _avoidTags
-                ..clear()
-                ..add(tag);
+              _avoidTags..clear()..add(tag);
             }
           } else {
             _avoidTags.remove('none');
@@ -828,7 +764,6 @@ class _QuestionnaireScreenState extends State<QuestionnaireScreen> {
   }
 }
 
-/// Paletas de cor com tema escuro
 class _ColorPaletteSelector extends StatelessWidget {
   final int? selectedIndex;
   final ValueChanged<int> onSelected;
@@ -846,7 +781,6 @@ class _ColorPaletteSelector extends StatelessWidget {
       [Colors.deepPurple, Colors.indigo, Colors.black87],
       [Colors.brown, Colors.green, Colors.orange.shade200],
     ];
-
     final labels = [
       'Quente / vibrante',
       'Suave / leve',
@@ -857,7 +791,6 @@ class _ColorPaletteSelector extends StatelessWidget {
     return Column(
       children: List.generate(palettes.length, (i) {
         final isSelected = selectedIndex == i;
-        final colors = palettes[i];
         return GestureDetector(
           onTap: () => onSelected(i),
           child: Container(
@@ -875,11 +808,8 @@ class _ColorPaletteSelector extends StatelessWidget {
             ),
             child: Row(
               children: [
-                ...colors.map(
-                  (c) => Expanded(
-                    child: Container(height: 32, color: c),
-                  ),
-                ),
+                ...palettes[i].map((c) =>
+                    Expanded(child: Container(height: 32, color: c))),
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
@@ -895,7 +825,6 @@ class _ColorPaletteSelector extends StatelessWidget {
   }
 }
 
-/// Chips de seleção única com tema do app
 class _OptionChips extends StatelessWidget {
   final List<String> options;
   final int? selectedIndex;
@@ -915,21 +844,20 @@ class _OptionChips extends StatelessWidget {
       children: List.generate(options.length, (i) {
         final selected = selectedIndex == i;
         return ChoiceChip(
-          label: Text(
-            options[i],
-            style: TextStyle(
-                color: selected ? const Color(0xFF0D1B2A) : Colors.white),
-          ),
+          label: Text(options[i],
+              style: TextStyle(
+                  color: selected
+                      ? const Color(0xFF0D1B2A)
+                      : Colors.white)),
           selected: selected,
           selectedColor: const Color(0xFFFFD700),
           backgroundColor: const Color(0xFF1B263B),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(
-              color: selected
-                  ? const Color(0xFFFFD700)
-                  : Colors.grey.shade600,
-            ),
+                color: selected
+                    ? const Color(0xFFFFD700)
+                    : Colors.grey.shade600),
           ),
           onSelected: (_) => onSelected(i),
         );

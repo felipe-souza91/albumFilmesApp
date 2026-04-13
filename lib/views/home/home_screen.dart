@@ -1,5 +1,6 @@
 // lib/views/home/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../../models/movie.dart';
 import '../../providers/movie_provider.dart';
@@ -41,12 +42,20 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _sortearFilme(BuildContext context) {
+  /// Retorna um filme aleatório não-assistido, ou null se não houver nenhum.
+  Movie? _pickRandomMovie() {
     final movieProvider = Provider.of<MovieProvider>(context, listen: false);
     final movies =
         movieProvider.filteredMovies.where((m) => !m.isWatched).toList();
+    if (movies.isEmpty) return null;
+    movies.shuffle();
+    return movies.first;
+  }
 
-    if (movies.isEmpty) {
+  void _sortearFilme(BuildContext context) {
+    final filme = _pickRandomMovie();
+
+    if (filme == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Nenhum filme disponível para sortear.'),
@@ -56,35 +65,39 @@ class HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final random = movies..shuffle();
-    final filmeSorteado = random.first;
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MovieDetailsScreen(movie: filmeSorteado),
-      ),
-    );
+    // BUG FIX: addPostFrameCallback evita assertion '_userGesturesInProgress > 0'
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MovieDetailsScreen(
+            movie: filme,
+            origin: MovieDetailsOrigin.random,
+            // Callback de resortear: usado pelo botão "resortear" na tela de detalhes
+            onReshuffle: () async => _pickRandomMovie(),
+          ),
+        ),
+      );
+    });
   }
 
-  /// Deriva tags de conteúdo do filme para uso no sorteio inteligente.
-  /// As tags refletem intensidade/temática e são usadas pelo [PersonalizedPickerService]
-  /// para ajustar o score de acordo com a tolerância de intensidade do usuário.
+  /// Deriva tags de conteúdo do filme para uso no sorteio personalizado.
+  /// Usadas pelo [PersonalizedPickerService] para ajustar score de
+  /// intensidade, contexto social e filtros de conteúdo evitado.
   Set<String> _deriveTagsFromMovie(Movie movie) {
     final tags = <String>{};
     final g = movie.genres.map((e) => e.toLowerCase()).toSet();
     final k = movie.keywords.map((e) => e.toLowerCase()).toSet();
 
-    bool containsAny(Set<String> base, List<String> needles) {
-      return base.any((v) => needles.any((n) => v.contains(n)));
-    }
+    bool containsAny(Set<String> base, List<String> needles) =>
+        base.any((v) => needles.any((n) => v.contains(n)));
 
     if (containsAny(g, ['terror', 'horror', 'suspense', 'thriller']) ||
         containsAny(k, ['terror', 'horror', 'assustador', 'thriller'])) {
       tags.add('terror_supernatural');
     }
 
-    // Ação e guerra = conteúdo potencialmente violento
     if (containsAny(g, ['guerra', 'war', 'crime']) ||
         containsAny(k, ['violento', 'guerra', 'crime', 'luta', 'batalha'])) {
       tags.add('violence_graphic');
@@ -95,7 +108,7 @@ class HomeScreenState extends State<HomeScreen> {
       tags.add('sad_heavy');
     }
 
-    // Tag de conteúdo família/infantil — usada pelo fator de socialMode
+    // Tag usada pelo fator de socialMode (família vs solo)
     if (containsAny(g, ['família', 'family', 'animação', 'animation'])) {
       tags.add('family_friendly');
     }
@@ -111,31 +124,37 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _sortearFilmePersonalizado(BuildContext context) async {
+  /// Retorna um filme via sorteio inteligente, ou null se não for possível.
+  /// Exibe SnackBar explicativo em caso de falha.
+  Future<Movie?> _pickSmartMovie() async {
     final movieProvider = Provider.of<MovieProvider>(context, listen: false);
 
     final prefs =
         await UserPreferencesService.instance.getCurrentUserPreferences();
 
     if (prefs == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Antes, responda o questionário de preferências em Perfil > Preferências 😉',
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Antes, responda o questionário de preferências em Perfil > Preferências 😉',
+            ),
           ),
-        ),
-      );
-      return;
+        );
+      }
+      return null;
     }
 
     final movies =
         movieProvider.filteredMovies.where((m) => !m.isWatched).toList();
 
     if (movies.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nenhum filme disponível para sortear.')),
-      );
-      return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nenhum filme disponível para sortear.')),
+        );
+      }
+      return null;
     }
 
     final candidates = movies.map((m) {
@@ -143,17 +162,9 @@ class HomeScreenState extends State<HomeScreen> {
         movie: m,
         title: m.title,
         releaseYear: _releaseYearFromMovie(m),
-        runtimeMinutes: null, // não disponível no modelo atual
-        // BUG FIX: Antes usava m.rating (estrelas do usuário, sempre 0 para
-        // não-assistidos), tornando o fator de qualidade inútil.
-        // Agora usa m.voteAverage (nota TMDB, 0-10), que é um sinal real de
-        // qualidade cinematográfica. Filmes antigos no Firestore recebem 5.0
-        // (neutro) via fallback no Movie.fromJson.
+        runtimeMinutes: null,
         voteAverage: m.voteAverage,
-        // BUG FIX: Antes hardcoded em 0.5, cegando o fator de novelty.
-        // Agora usa a popularidade normalizada salva pelo TMDBService.
-        // Filmes sem o campo (importados antes da correção) recebem 0.5.
-        popularityNormalized: (m as dynamic).popularityNorm ?? 0.5,
+        popularityNormalized: m.popularityNorm,
         isWatched: m.isWatched,
         isAdult: false,
         genres: m.genres.toSet(),
@@ -164,7 +175,7 @@ class HomeScreenState extends State<HomeScreen> {
     final picked =
         PersonalizedPickerService.instance.pickMovie<Movie>(candidates, prefs);
 
-    if (picked == null) {
+    if (picked == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -173,15 +184,31 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         ),
       );
-      return;
     }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MovieDetailsScreen(movie: picked.movie),
-      ),
-    );
+    return picked?.movie;
+  }
+
+  Future<void> _sortearFilmePersonalizado(BuildContext context) async {
+    final filme = await _pickSmartMovie();
+    if (filme == null) return;
+
+    // BUG FIX: navegação adiada para o próximo frame após o await,
+    // evitando a assertion '_userGesturesInProgress > 0' do Navigator.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MovieDetailsScreen(
+            movie: filme,
+            origin: MovieDetailsOrigin.smart,
+            // Callback de resortear: reutiliza a mesma lógica inteligente
+            onReshuffle: () => _pickSmartMovie(),
+          ),
+        ),
+      );
+    });
   }
 
   @override
@@ -218,7 +245,8 @@ class HomeScreenState extends State<HomeScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                MaterialPageRoute(
+                    builder: (context) => const ProfileScreen()),
               );
             },
           ),
@@ -296,8 +324,17 @@ class HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 4),
               Expanded(
                 child: GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  // BUG FIX: padding inferior dinâmico garante que o último card
+                  // não fique oculto atrás da barra de navegação por gestos
+                  // em dispositivos Xiaomi (MIUI) e outros com barra flutuante.
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    16,
+                    16,
+                    16 + MediaQuery.of(context).padding.bottom,
+                  ),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 0.7,
                     crossAxisSpacing: 16,
@@ -305,8 +342,7 @@ class HomeScreenState extends State<HomeScreen> {
                   ),
                   itemCount: movies.length,
                   itemBuilder: (context, index) {
-                    final movie = movies[index];
-                    return _buildMovieCard(movie);
+                    return _buildMovieCard(movies[index]);
                   },
                 ),
               ),
@@ -340,7 +376,8 @@ class HomeScreenState extends State<HomeScreen> {
       },
       child: Card(
         elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -419,7 +456,8 @@ class HomeScreenState extends State<HomeScreen> {
                     color: Colors.green,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.check, color: Colors.white, size: 16),
+                  child: const Icon(Icons.check,
+                      color: Colors.white, size: 16),
                 ),
               ),
           ],
@@ -441,9 +479,7 @@ class HomeScreenState extends State<HomeScreen> {
             textInputAction: TextInputAction.search,
             onSubmitted: (_) {
               setState(() => _searchQuery = searchText);
-              final movieProvider =
-                  Provider.of<MovieProvider>(context, listen: false);
-              movieProvider
+              Provider.of<MovieProvider>(context, listen: false)
                   .setNameFilter(searchText.isEmpty ? null : searchText);
               Navigator.pop(context);
             },
@@ -453,7 +489,8 @@ class HomeScreenState extends State<HomeScreen> {
             decoration: InputDecoration(
               hintText: 'Digite o nome do filme',
               hintStyle: const TextStyle(color: Colors.white54),
-              prefixIcon: const Icon(Icons.search, color: Color(0xFFFFD700)),
+              prefixIcon:
+                  const Icon(Icons.search, color: Color(0xFFFFD700)),
               filled: true,
               fillColor: Colors.white10,
               enabledBorder: OutlineInputBorder(
@@ -481,14 +518,13 @@ class HomeScreenState extends State<HomeScreen> {
                   backgroundColor: const Color(0xFFFFD700)),
               onPressed: () {
                 setState(() => _searchQuery = searchText);
-                final movieProvider =
-                    Provider.of<MovieProvider>(context, listen: false);
-                movieProvider
+                Provider.of<MovieProvider>(context, listen: false)
                     .setNameFilter(searchText.isEmpty ? null : searchText);
                 Navigator.pop(context);
               },
               child: const Text('Buscar',
-                  style: TextStyle(color: Color.fromRGBO(11, 18, 34, 1.0))),
+                  style:
+                      TextStyle(color: Color.fromRGBO(11, 18, 34, 1.0))),
             ),
           ],
         );
@@ -516,7 +552,7 @@ class HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setStateDialog) {
             return Theme(
               data: ThemeData(
                 primaryColor: const Color(0xFFFFD700),
@@ -551,35 +587,35 @@ class HomeScreenState extends State<HomeScreen> {
                           children: [
                             FilterChip(
                               showCheckmark: false,
-                              labelStyle: const TextStyle(color: Colors.black),
+                              labelStyle:
+                                  const TextStyle(color: Colors.black),
                               selectedColor: const Color(0xFFFFD700),
                               label: const Text('Todos'),
                               selected: selectedGenre.isEmpty,
-                              onSelected: (selected) {
-                                setState(() => selectedGenre = []);
-                              },
+                              onSelected: (_) =>
+                                  setStateDialog(() => selectedGenre = []),
                             ),
                             ...genresList
-                                .where((genre) => genre.trim().isNotEmpty)
-                                .map((genre) {
-                              return FilterChip(
-                                labelStyle:
-                                    const TextStyle(color: Colors.black),
-                                showCheckmark: false,
-                                selectedColor: const Color(0xFFFFD700),
-                                label: Text(genre),
-                                selected: selectedGenre.contains(genre),
-                                onSelected: (selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedGenres.add(genre);
-                                    } else {
-                                      _selectedGenres.remove(genre);
-                                    }
-                                  });
-                                },
-                              );
-                            }),
+                                .where((g) => g.trim().isNotEmpty)
+                                .map((genre) => FilterChip(
+                                      labelStyle: const TextStyle(
+                                          color: Colors.black),
+                                      showCheckmark: false,
+                                      selectedColor:
+                                          const Color(0xFFFFD700),
+                                      label: Text(genre),
+                                      selected:
+                                          selectedGenre.contains(genre),
+                                      onSelected: (selected) {
+                                        setStateDialog(() {
+                                          if (selected) {
+                                            _selectedGenres.add(genre);
+                                          } else {
+                                            _selectedGenres.remove(genre);
+                                          }
+                                        });
+                                      },
+                                    )),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -599,32 +635,32 @@ class HomeScreenState extends State<HomeScreen> {
                               selectedColor: const Color(0xFFFFD700),
                               label: const Text('Todas'),
                               selected: selectedPlatform.isEmpty,
-                              onSelected: (_) {
-                                setState(() => selectedPlatform = []);
-                              },
+                              onSelected: (_) => setStateDialog(
+                                  () => selectedPlatform = []),
                             ),
                             ...platformsList
-                                .where(
-                                    (platform) => platform.trim().isNotEmpty)
-                                .map((platform) {
-                              return FilterChip(
-                                labelStyle:
-                                    const TextStyle(color: Colors.black),
-                                showCheckmark: false,
-                                selectedColor: const Color(0xFFFFD700),
-                                label: Text(platform),
-                                selected: selectedPlatform.contains(platform),
-                                onSelected: (selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedPlatforms.add(platform);
-                                    } else {
-                                      _selectedPlatforms.remove(platform);
-                                    }
-                                  });
-                                },
-                              );
-                            }),
+                                .where((p) => p.trim().isNotEmpty)
+                                .map((platform) => FilterChip(
+                                      labelStyle: const TextStyle(
+                                          color: Colors.black),
+                                      showCheckmark: false,
+                                      selectedColor:
+                                          const Color(0xFFFFD700),
+                                      label: Text(platform),
+                                      selected: selectedPlatform
+                                          .contains(platform),
+                                      onSelected: (selected) {
+                                        setStateDialog(() {
+                                          if (selected) {
+                                            _selectedPlatforms
+                                                .add(platform);
+                                          } else {
+                                            _selectedPlatforms
+                                                .remove(platform);
+                                          }
+                                        });
+                                      },
+                                    )),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -644,9 +680,8 @@ class HomeScreenState extends State<HomeScreen> {
                               showCheckmark: false,
                               label: const Text('Todos'),
                               selected: watchedStatus.isEmpty,
-                              onSelected: (_) {
-                                setState(() => watchedStatus = '');
-                              },
+                              onSelected: (_) => setStateDialog(
+                                  () => watchedStatus = ''),
                             ),
                             FilterChip(
                               labelStyle:
@@ -655,9 +690,8 @@ class HomeScreenState extends State<HomeScreen> {
                               showCheckmark: false,
                               label: const Text('Assistidos'),
                               selected: watchedStatus == 'watched',
-                              onSelected: (_) {
-                                setState(() => watchedStatus = 'watched');
-                              },
+                              onSelected: (_) => setStateDialog(
+                                  () => watchedStatus = 'watched'),
                             ),
                             FilterChip(
                               labelStyle:
@@ -666,10 +700,8 @@ class HomeScreenState extends State<HomeScreen> {
                               showCheckmark: false,
                               label: const Text('Não assistidos'),
                               selected: watchedStatus == 'not_watched',
-                              onSelected: (_) {
-                                setState(
-                                    () => watchedStatus = 'not_watched');
-                              },
+                              onSelected: (_) => setStateDialog(
+                                  () => watchedStatus = 'not_watched'),
                             ),
                           ],
                         ),
@@ -685,7 +717,7 @@ class HomeScreenState extends State<HomeScreen> {
                   TextButton(
                     onPressed: () {
                       movieProvider.clearFilters();
-                      setState(() {
+                      setStateDialog(() {
                         _selectedGenres = [];
                         _selectedPlatforms = [];
                       });
@@ -697,7 +729,7 @@ class HomeScreenState extends State<HomeScreen> {
                     style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFD700)),
                     onPressed: () {
-                      setState(() {
+                      setStateDialog(() {
                         _selectedGenres = selectedGenre;
                         _selectedPlatforms = selectedPlatform;
                       });

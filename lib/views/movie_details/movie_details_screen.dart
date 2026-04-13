@@ -43,6 +43,7 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
   double _rating = 0.0;
   bool _isLoading = false;
   bool _isRatingSaving = false;
+  bool _isReshuffling = false;
 
   @override
   void initState() {
@@ -375,6 +376,38 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
     );
   }
 
+  /// Refaz o sorteio (aleatório ou inteligente) usando o callback fornecido
+  /// pelo home_screen. Substitui a tela atual pelo novo filme sorteado.
+  Future<void> _reshuffle() async {
+    if (widget.onReshuffle == null || _isReshuffling) return;
+
+    setState(() => _isReshuffling = true);
+
+    try {
+      final novoFilme = await widget.onReshuffle!();
+      if (!mounted) return;
+
+      if (novoFilme == null) {
+        // onReshuffle já exibiu o SnackBar explicativo
+        return;
+      }
+
+      // Substitui a tela atual em vez de empilhar uma nova
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MovieDetailsScreen(
+            movie: novoFilme,
+            origin: widget.origin,
+            onReshuffle: widget.onReshuffle,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isReshuffling = false);
+    }
+  }
+
   void _showScratchDialog() {
     showDialog(
       context: context,
@@ -426,7 +459,12 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // BUG FIX: PopScope garante que o Flutter controla o gesto de voltar antes
+    // que o Android aplique o efeito visual do Predictive Back (Android 13+),
+    // eliminando o deslocamento lateral da tela ao pressionar o botão voltar.
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
       backgroundColor: const Color(0xFF0D1B2A),
       appBar: AppBar(
         iconTheme: const IconThemeData(color: Color(0xFFFFD700)),
@@ -602,25 +640,81 @@ class MovieDetailsScreenState extends State<MovieDetailsScreen> {
                 ],
               ),
             ),
-      floatingActionButton: !_isWatched
-          ? FloatingActionButton.extended(
-              onPressed: _showScratchDialog,
-              backgroundColor: const Color(0xFFFFD700),
-              icon: const Icon(Icons.check, color: Color(0xFF0D1B2A)),
-              label: const Text(
-                'Marcar como assistido',
-                style: TextStyle(color: Color(0xFF0D1B2A)),
-              ),
+      // Quando veio de um sorteio, exibe o botão de resortear à esquerda
+      // usando floatingActionButtonLocation + Stack não é necessário —
+      // basta usar floatingActionButtonLocation e um Column no FAB.
+      floatingActionButtonLocation: widget.origin != MovieDetailsOrigin.none
+          ? FloatingActionButtonLocation.centerFloat
+          : FloatingActionButtonLocation.endFloat,
+      floatingActionButton: widget.origin != MovieDetailsOrigin.none
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Botão de resortear (esquerda)
+                FloatingActionButton(
+                  heroTag: 'reshuffle',
+                  onPressed: _isReshuffling ? null : _reshuffle,
+                  backgroundColor: const Color(0xFF1B263B),
+                  tooltip: widget.origin == MovieDetailsOrigin.smart
+                      ? 'Resortear (inteligente)'
+                      : 'Resortear (aleatório)',
+                  child: _isReshuffling
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFFFD700),
+                          ),
+                        )
+                      : Icon(
+                          widget.origin == MovieDetailsOrigin.smart
+                              ? Icons.auto_awesome
+                              : Icons.shuffle_rounded,
+                          color: const Color(0xFFFFD700),
+                        ),
+                ),
+                const SizedBox(width: 16),
+                // Botão principal (direita)
+                FloatingActionButton.extended(
+                  heroTag: 'watched',
+                  onPressed: _isWatched ? _markAsUnwatched : _showScratchDialog,
+                  backgroundColor: _isWatched
+                      ? const Color.fromARGB(255, 224, 48, 30)
+                      : const Color(0xFFFFD700),
+                  icon: Icon(Icons.check,
+                      color: _isWatched ? Colors.white : const Color(0xFF0D1B2A)),
+                  label: Text(
+                    _isWatched ? 'Marcar como não assistido' : 'Marcar como assistido',
+                    style: TextStyle(
+                        color: _isWatched ? Colors.white : const Color(0xFF0D1B2A)),
+                  ),
+                ),
+              ],
             )
-          : FloatingActionButton.extended(
-              onPressed: _markAsUnwatched,
-              backgroundColor: const Color.fromARGB(255, 224, 48, 30),
-              icon: const Icon(Icons.check, color: Color(0xFF0D1B2A)),
-              label: const Text(
-                'Marcar como não assistido',
-                style: TextStyle(color: Color(0xFF0D1B2A)),
-              ),
-            ),
-    );
+          : !_isWatched
+              ? FloatingActionButton.extended(
+                  heroTag: 'watched',
+                  onPressed: _showScratchDialog,
+                  backgroundColor: const Color(0xFFFFD700),
+                  icon: const Icon(Icons.check, color: Color(0xFF0D1B2A)),
+                  label: const Text(
+                    'Marcar como assistido',
+                    style: TextStyle(color: Color(0xFF0D1B2A)),
+                  ),
+                )
+              : FloatingActionButton.extended(
+                  heroTag: 'watched',
+                  onPressed: _markAsUnwatched,
+                  backgroundColor: const Color.fromARGB(255, 224, 48, 30),
+                  icon: const Icon(Icons.check, color: Color(0xFF0D1B2A)),
+                  label: const Text(
+                    'Marcar como não assistido',
+                    style: TextStyle(color: Color(0xFF0D1B2A)),
+                  ),
+                ),
+      ), // Scaffold
+    ); // PopScope
   }
 }

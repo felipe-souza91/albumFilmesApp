@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart' as p;
 
+import '../services/firestore_service.dart';
 import '../views/auth/login_screen.dart';
 import 'preferences_screen.dart';
 
@@ -211,44 +212,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _showPhotoUrlDialog() async {
-    final controller = TextEditingController(text: _photoUrl);
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF0D1B2A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Adicionar/alterar foto (URL)',
-            style: TextStyle(color: Color(0xFFFFD700))),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-              hintText: 'https://...',
-              hintStyle: TextStyle(color: Colors.white54)),
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancelar', style: TextStyle(color: Colors.white70)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFD700),
-              foregroundColor: const Color(0xFF0D1B2A),
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _updateProfile(photoUrl: controller.text);
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _removePhoto() async {
     await _updateProfile(photoUrl: '');
   }
@@ -358,6 +321,157 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// LGPD: exibe diálogo de confirmação, reautentica o usuário e apaga
+  /// todos os seus dados do Firestore, Storage e Firebase Auth.
+  Future<void> _deleteAccountDialog() async {
+    final passwordController = TextEditingController();
+    String? dialogError;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF0D1B2A),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              'Excluir conta',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Esta ação é irreversível. Todos os seus dados serão '
+                  'permanentemente excluídos:\n'
+                  '• Perfil e preferências\n'
+                  '• Histórico de filmes assistidos\n'
+                  '• Conquistas e métricas\n'
+                  '• Foto de perfil',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Confirme sua senha para continuar:',
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Sua senha',
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white24),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                          color: Colors.redAccent, width: 2),
+                    ),
+                  ),
+                ),
+                if (dialogError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      dialogError!,
+                      style: const TextStyle(
+                          color: Colors.redAccent, fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar',
+                    style: TextStyle(color: Colors.white70)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final password = passwordController.text.trim();
+                  if (password.isEmpty) {
+                    setStateDialog(
+                        () => dialogError = 'Digite sua senha para confirmar.');
+                    return;
+                  }
+
+                  final user = _user;
+                  if (user == null || user.email == null) return;
+
+                  // Reautentica antes de operações sensíveis (exigido pelo Firebase)
+                  try {
+                    final credential = EmailAuthProvider.credential(
+                      email: user.email!,
+                      password: password,
+                    );
+                    await user.reauthenticateWithCredential(credential);
+                    if (context.mounted) Navigator.pop(context, true);
+                  } on FirebaseAuthException catch (e) {
+                    final msg = e.code == 'wrong-password' ||
+                            e.code == 'invalid-credential'
+                        ? 'Senha incorreta. Tente novamente.'
+                        : 'Não foi possível verificar sua identidade.';
+                    setStateDialog(() => dialogError = msg);
+                  }
+                },
+                child: const Text('Excluir minha conta'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final user = _user;
+    if (user == null) return;
+
+    setState(() => _isSaving = true);
+    try {
+      // 1) Apaga todos os dados do Firestore e Storage
+      await FirestoreService().deleteAllUserData(user.uid);
+
+      // 2) Apaga a conta no Firebase Auth
+      await user.delete();
+
+      if (!mounted) return;
+      // Redireciona para login sem possibilidade de voltar
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                e.message ?? 'Erro ao excluir conta. Tente novamente.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro inesperado ao excluir conta: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final email = _user?.email ?? 'Sem e-mail';
@@ -378,77 +492,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Column(
-              children: [
-                ProfilePic(
-                  photoUrl: _photoUrl,
-                  onChangePhoto: _pickPhotoFromGallery,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _displayName.isEmpty ? 'Usuário' : _displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+          // BUG FIX: SafeArea envolve o scroll para que o último item
+          // (Log Out) não fique oculto pela barra de gestos em Xiaomi/MIUI.
+          SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                children: [
+                  ProfilePic(
+                    photoUrl: _photoUrl,
+                    onChangePhoto: _pickPhotoFromGallery,
                   ),
-                ),
-                Text(
-                  email,
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 20),
-                ProfileMenu(
-                  text: 'Editar nome',
-                  iconData: Icons.badge,
-                  press: _showEditNameDialog,
-                ),
-                ProfileMenu(
-                  text: 'Escolher foto da galeria',
-                  iconData: Icons.photo_library,
-                  press: _pickPhotoFromGallery,
-                ),
-                ProfileMenu(
-                  text: 'Inserir URL da foto',
-                  iconData: Icons.link,
-                  press: _showPhotoUrlDialog,
-                ),
-                ProfileMenu(
-                  text: 'Remover foto',
-                  iconData: Icons.delete_outline,
-                  press: _removePhoto,
-                ),
-                ProfileMenu(
-                  text: 'Alterar senha',
-                  iconData: Icons.lock_reset,
-                  press: _changePasswordDialog,
-                ),
-                ProfileMenu(
-                  text: 'Preferências',
-                  iconData: Icons.settings,
-                  press: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PreferencesScreen(),
-                      ),
-                    );
-                  },
-                ),
-                ProfileMenu(
-                  text: 'Log Out',
-                  iconData: Icons.logout,
-                  press: () async {
-                    await FirebaseAuth.instance.signOut();
-                    if (!context.mounted) return;
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Text(
+                    _displayName.isEmpty ? 'Usuário' : _displayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  Text(
+                    email,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 20),
+                  ProfileMenu(
+                    text: 'Editar nome',
+                    iconData: Icons.badge,
+                    press: _showEditNameDialog,
+                  ),
+                  ProfileMenu(
+                    text: 'Remover foto',
+                    iconData: Icons.delete_outline,
+                    press: _removePhoto,
+                  ),
+                  ProfileMenu(
+                    text: 'Alterar senha',
+                    iconData: Icons.lock_reset,
+                    press: _changePasswordDialog,
+                  ),
+                  ProfileMenu(
+                    text: 'Preferências',
+                    iconData: Icons.settings,
+                    press: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PreferencesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  ProfileMenu(
+                    text: 'Log Out',
+                    iconData: Icons.logout,
+                    press: () async {
+                      await FirebaseAuth.instance.signOut();
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
+                    },
+                  ),
+                  // LGPD: opção de exclusão de conta e dados pessoais
+                  ProfileMenu(
+                    text: 'Excluir minha conta',
+                    iconData: Icons.delete_forever,
+                    press: _deleteAccountDialog,
+                    isDestructive: true,
+                  ),
+                ],
+              ),
             ),
           ),
           if (_isSaving)
@@ -554,14 +670,22 @@ class ProfileMenu extends StatelessWidget {
     required this.text,
     required this.iconData,
     this.press,
+    this.isDestructive = false,
   });
 
   final String text;
   final IconData? iconData;
   final VoidCallback? press;
+  // Quando true, exibe o item em vermelho para indicar ação destrutiva (ex: excluir conta)
+  final bool isDestructive;
 
   @override
   Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.redAccent : const Color(0xFF757575);
+    final iconColor = isDestructive
+        ? Colors.redAccent
+        : const Color.fromRGBO(11, 18, 34, 1.0);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: TextButton(
@@ -575,15 +699,15 @@ class ProfileMenu extends StatelessWidget {
         onPressed: press,
         child: Row(
           children: [
-            Icon(iconData, color: const Color.fromRGBO(11, 18, 34, 1.0)),
+            Icon(iconData, color: iconColor),
             const SizedBox(width: 20),
             Expanded(
               child: Text(
                 text,
-                style: const TextStyle(color: Color(0xFF757575)),
+                style: TextStyle(color: color),
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, color: Color(0xFF757575)),
+            Icon(Icons.arrow_forward_ios, color: color),
           ],
         ),
       ),

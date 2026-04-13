@@ -29,7 +29,12 @@ class _SplashScreenState extends State<SplashScreen>
     // Redireciona após 5 segundos
     Timer(const Duration(seconds: 5), () {
       if (mounted) {
-        final hasActiveSession = FirebaseAuth.instance.currentUser != null;
+        bool hasActiveSession = false;
+        try {
+          hasActiveSession = FirebaseAuth.instance.currentUser != null;
+        } catch (_) {
+          // Firebase não inicializado — redireciona para login
+        }
         Navigator.pushReplacementNamed(
           context,
           hasActiveSession ? '/home' : '/login',

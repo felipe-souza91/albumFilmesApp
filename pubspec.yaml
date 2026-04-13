@@ -9,8 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # BUG FIX: Adicionado para corrigir formato de data no DatePicker (pt-BR)
-  # e suporte a localização em todo o app
+  # BUG FIX: flutter_localizations readicionado para forçar pt-BR no DatePicker.
+  # O congelamento anterior era causado por falta de firebase config (google-services.json),
+  # não pelo flutter_localizations em si. Com Firebase configurado corretamente, é seguro usá-lo.
   flutter_localizations:
     sdk: flutter
   firebase_core: ^3.13.0
@@ -54,12 +55,13 @@ flutter_native_splash:
 flutter:
   uses-material-design: true
   assets:
+    - assets/.env
     - assets/icons/user.jpg
     - assets/icons/splash.png
     - assets/icons/achievements/
     - assets/logo.png
     - assets/logo_tiny.png
-    
+
 flutter_icons:
   android: true
   ios: true

@@ -48,10 +48,12 @@ class MovieCandidate<T> {
 ///  Contexto social     │ 0.07 │ pergunta 6 ("assisto sozinho/família...?")
 /// ──────────────────────────────────────────────────────────────────────────
 ///
-/// GÊNEROS NÃO-GOSTADOS:
-///  Filmes com APENAS gêneros não-gostados (sem nenhum favorito) recebem
-///  um multiplicador de 0.04 sobre o score total → ~4% da probabilidade
-///  de um filme neutro. Extremamente raros, mas possíveis (exploração).
+/// GÊNEROS NÃO-GOSTADOS — BUG FIX (assertividade):
+///  O pool de filmes agora prioriza filmes SEM gêneros não-gostados.
+///  Filmes com qualquer gênero não-gostado recebem penalidade multiplicativa:
+///    - Apenas gêneros não-gostados (sem favorito): ×0.02 → ~2% de chance
+///    - Mix (favorito + não-gostado): ×0.20 → moderadamente raro
+///  O pool "limpo" (favoritos sem não-gostados) é sempre preferido quando disponível.
 /// ─────────────────────────────────────────────────────────────────────────────
 class PersonalizedPickerService {
   PersonalizedPickerService._();
@@ -60,9 +62,14 @@ class PersonalizedPickerService {
 
   final _random = Random();
 
-  // Filmes com APENAS gêneros não-gostados recebem este multiplicador.
-  // 0.04 = "extremamente raro" mas não impossível → preserva exploração.
-  static const double _dislikedOnlyPenalty = 0.04;
+  // BUG FIX: Penalidade para filmes com APENAS gêneros não-gostados (sem favorito).
+  // Reduzido de 0.04 para 0.02 — mais assertivo conforme feedback de usuários.
+  static const double _dislikedOnlyPenalty = 0.02;
+
+  // BUG FIX: Penalidade para filmes com gênero favorito MAS TAMBÉM não-gostado.
+  // Antes esses filmes não sofriam penalidade alguma (porque estavam no favPool).
+  // Agora recebem 0.20 → presença moderada, não totalmente excluídos.
+  static const double _dislikedMixedPenalty = 0.20;
 
   MovieCandidate<T>? pickMovie<T>(
     List<MovieCandidate<T>> candidates,
@@ -98,13 +105,46 @@ class PersonalizedPickerService {
 
     if (filtered.isEmpty) return null;
 
-    // ── Etapa 2: Pool preferencial (gêneros favoritos têm prioridade) ─────
-    // Se o usuário tem favoritos, restringe o pool a esses filmes primeiro.
-    // Filmes não-gostados ficam fora deste pool, mas entram no fallback
-    // com penalidade de score multiplicativa.
-    final favPool =
-        filtered.where((c) => _hasFavoriteGenreMatch(c, prefs)).toList();
-    final pool = favPool.isNotEmpty ? favPool : filtered;
+    // ── Etapa 2: Pool preferencial — BUG FIX ──────────────────────────────
+    // Antes: o favPool incluía filmes favoritos MAS TAMBÉM com gêneros
+    // não-gostados (ex: Ação+Terror quando Terror é não-gostado). Isso fazia
+    // gêneros não-gostados aparecerem com frequência normal no pool principal.
+    //
+    // Agora: o pool limpo prioriza filmes com favorito E SEM não-gostado.
+    // Só cai para pools mais abrangentes se o anterior estiver vazio.
+    //   1) Pool limpo:   favorito presente  + sem nenhum não-gostado
+    //   2) Pool favorito: favorito presente (aceita mix com não-gostado)
+    //   3) Pool neutro:  sem favorito e sem não-gostado
+    //   4) Fallback:     todos (com penalidades máximas)
+    final cleanPool = prefs.favoriteGenres.isNotEmpty
+        ? filtered
+            .where((c) =>
+                _hasFavoriteGenreMatch(c, prefs) &&
+                !_hasAnyDislikedGenre(c, prefs))
+            .toList()
+        : <MovieCandidate<T>>[];
+
+    final favPool = prefs.favoriteGenres.isNotEmpty
+        ? filtered.where((c) => _hasFavoriteGenreMatch(c, prefs)).toList()
+        : <MovieCandidate<T>>[];
+
+    final neutralPool = filtered
+        .where((c) =>
+            !_hasFavoriteGenreMatch(c, prefs) &&
+            !_hasAnyDislikedGenre(c, prefs))
+        .toList();
+
+    // Escolhe o pool mais restrito que não esteja vazio
+    final List<MovieCandidate<T>> pool;
+    if (cleanPool.isNotEmpty) {
+      pool = cleanPool;
+    } else if (neutralPool.isNotEmpty) {
+      pool = neutralPool;
+    } else if (favPool.isNotEmpty) {
+      pool = favPool;
+    } else {
+      pool = filtered;
+    }
 
     // ── Etapa 3: Scoring ponderado ─────────────────────────────────────────
     final scores = <MovieCandidate<T>, double>{};
@@ -113,14 +153,17 @@ class PersonalizedPickerService {
     for (final c in pool) {
       double score = _scoreCandidate(c, prefs);
 
-      // Penalidade multiplicativa para filmes com APENAS gêneros não-gostados.
-      // O multiplier afeta o score inteiro (não só o fator de gênero),
-      // garantindo que esses filmes sejam extremamente raros sem serem
-      // completamente removidos — o app quer estimular exploração.
-      if (prefs.dislikedGenres.isNotEmpty &&
-          _hasAnyDislikedGenre(c, prefs) &&
-          !_hasFavoriteGenreMatch(c, prefs)) {
-        score *= _dislikedOnlyPenalty;
+      // BUG FIX: Penalidades por gênero não-gostado agora aplicadas em dois níveis:
+      //  - Apenas não-gostados (sem favorito): ×0.02 → quase impossível (~2%)
+      //  - Mix favorito+não-gostado: ×0.20 → raro (~20% de um filme neutro)
+      if (prefs.dislikedGenres.isNotEmpty) {
+        final hasDisliked = _hasAnyDislikedGenre(c, prefs);
+        final hasFav = _hasFavoriteGenreMatch(c, prefs);
+        if (hasDisliked && !hasFav) {
+          score *= _dislikedOnlyPenalty;   // 0.02 — quase nunca
+        } else if (hasDisliked && hasFav) {
+          score *= _dislikedMixedPenalty;  // 0.20 — raro
+        }
       }
 
       if (score <= 0) continue;

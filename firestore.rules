@@ -21,7 +21,8 @@ service cloud.firestore {
       allow read: if isAuth() && request.auth.uid == uid;
       allow create: if isAuth() && request.auth.uid == uid;
       allow update: if isAuth() && request.auth.uid == uid;
-      allow delete: if false;
+      // LGPD: permite que o próprio usuário exclua seu perfil
+      allow delete: if isAuth() && request.auth.uid == uid;
     }
 
     match /movies/{movieId} {
@@ -31,7 +32,10 @@ service cloud.firestore {
 
     match /user_movies/{docId} {
       allow read: if isAuth() && resource.data.userId == request.auth.uid;
-      allow create, update, delete: if isOwnerReq('userId');
+      allow create, update: if isOwnerReq('userId');
+      // BUG FIX: delete usa isOwner (resource.data) pois request.resource não
+      // existe em operações de exclusão — isOwnerReq falharia silenciosamente.
+      allow delete: if isOwner('userId');
     }
 
     match /achievements/{achId} {
@@ -44,7 +48,9 @@ service cloud.firestore {
         (resource != null && request.auth.uid == resource.data.userId) ||
         (resource == null && docId.matches('^' + request.auth.uid + '_.*$'))
       );
-      allow create, update, delete: if isOwnerReq('userId');
+      allow create, update: if isOwnerReq('userId');
+      // BUG FIX: mesmo fix — delete usa isOwner
+      allow delete: if isOwner('userId');
     }
 
     match /user_metrics/{docId} {
@@ -53,7 +59,9 @@ service cloud.firestore {
         (resource != null && request.auth.uid == resource.data.userId) ||
         (resource == null && docId.matches('^' + request.auth.uid + '_.*$'))
       );
-      allow create, update, delete: if isOwnerReq('userId');
+      allow create, update: if isOwnerReq('userId');
+      // BUG FIX: mesmo fix — delete usa isOwner
+      allow delete: if isOwner('userId');
     }
 
     match /questionnaires/{version} {
